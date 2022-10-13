@@ -45,8 +45,9 @@ class Installer:
         self.progress_bar = ttk.Progressbar(self.root, orient="horizontal",
                                             length=400, mode="determinate")
         self.progress_bar.pack()
-
         self.progress_bar["maximum"] = 110
+
+        center_window(self.root, width=400, height=50)
 
         self.download()
 
@@ -79,3 +80,17 @@ class Installer:
         os.remove(self.whl_path)
 
         self.root.destroy()
+
+
+def center_window(root, width=300, height=200):
+    # get screen width and height
+    ws = root.winfo_screenwidth() # width of the screen
+    hs = root.winfo_screenheight() # height of the screen
+
+    # calculate x and y coordinates for the Tk root window
+    x = (ws/2) - (width/2)
+    y = (hs/2) - (height/2)
+
+    # set the dimensions of the screen 
+    # and where it is placed
+    root.geometry('%dx%d+%d+%d' % (width, height, x, y))

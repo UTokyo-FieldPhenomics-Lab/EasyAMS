@@ -3,13 +3,13 @@ import Metashape
 
 from easyams import __version__, package_ready
 from easyams.utils import show_chunk_info, in_dev_info
+from easyams.installer import center_window
 
 if package_ready:
     window = tk.Tk()
     window.title(f"EasyAMS {__version__}")
 
     greeting = tk.Label(text="Welcome to use EasyAMS plugin")
-
 
     button1 = tk.Button(
         text="Show chunk info",
@@ -42,6 +42,8 @@ if package_ready:
     button2.pack()
     button3.pack()
     button4.pack()
+
+    center_window(window, width=400, height=250)
 
     window.mainloop()
 else:
