@@ -1,0 +1,10 @@
+# opencv numpy requirements
+numpy==1.26.4
+
+# stag
+stag-python==1.1.0
+opencv-python==4.9.0.80
+
+# inference
+onnx==1.14.0
+onnxruntime==1.15.1

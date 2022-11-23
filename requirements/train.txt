@@ -1,0 +1,5 @@
+# opencv numpy requirements
+numpy==1.26.4
+
+# yolov11
+ultralytics==8.3.63
