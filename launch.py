@@ -2,7 +2,7 @@ import tkinter as tk
 import Metashape
 
 from easyams import __version__, package_ready
-from easyams.utils import show_chunk_info, in_dev_info
+from easyams.utils import show_chunk_info, in_dev_info, img_loader
 from easyams.installer import center_window
 
 if package_ready:
@@ -21,7 +21,7 @@ if package_ready:
     button2 = tk.Button(
         text="Batch import images",
         width=25,
-        command=in_dev_info
+        command= lambda: img_loader(window)
     )
 
     button3 = tk.Button(
