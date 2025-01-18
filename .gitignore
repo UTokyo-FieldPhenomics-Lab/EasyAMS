@@ -1,5 +1,6 @@
 # gitignore in this project
 src/*
+*.pt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
