@@ -7,3 +7,7 @@ torchvision==0.20.1
 
 # yolov11
 ultralytics==8.3.63
+
+# spliting datasets
+# scikit_learn==1.6.1
+# scikit-image==0.24.0
