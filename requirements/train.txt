@@ -2,11 +2,11 @@ numpy==1.26.4
 
 # torch dependecies
 torch==2.5.1
-torchaudio==2.5.1
 torchvision==0.20.1
 
 # yolov11
 ultralytics==8.3.63
 
 labelme==5.6.1
+# labelme requires the following to run correctly on Linux
 opencv-python-headless==4.10.0.84
