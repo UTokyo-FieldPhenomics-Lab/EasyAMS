@@ -1,9 +1,9 @@
 import os
 import sys
 import platform
+import shutil
 
 import Metashape
-from PySide2 import QtWidgets, QtGui, QtCore
 
 class Installer:
 
@@ -11,13 +11,21 @@ class Installer:
         
         self.system = platform.system()
 
-        self.user_script_path = self.get_metashape_scripts_path()
+        self.metashape_user_script_folder = self.get_metashape_scripts_path()
 
         # current metashape buildin Python execuatable path
-        self.ms_python_executable_path = sys.executable
+        self.metashape_python_executable_path = sys.executable
+        # sys.version >>> '3.9.13 (main, Sep  9 2022, 11:31:02) \n[GCC 8.4.0]'
+        self.metashape_python_version = sys.version.split(' ')[0] 
 
         # get current script path
-        self.installer_script_folder = os.path.dirname(os.path.abspath(__file__))
+        self.easyams_installer_folder = os.path.dirname(os.path.abspath(__file__))
+
+        self.easyams_plugin_folder = os.path.join(self.metashape_user_script_folder, "EasyAMS")
+        if not os.path.exists(self.easyams_plugin_folder):
+            os.makedirs(self.easyams_plugin_folder)
+
+        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
 
     def get_metashape_scripts_path(self):
 
@@ -30,15 +38,66 @@ class Installer:
         elif self.system == "Darwin":  # macOS
             path = os.path.join(home_dir, "Library", "Application Support", "Agisoft", "Metashape Pro", "scripts")
         else:
-            raise OSError("Unsupported operating system")
+            Metashape.app.messageBox("[EasyAMS] Unsupported operating system")
+            raise OSError("[EasyAMS] Unsupported operating system")
 
         return path
     
+    def check_campatibility(self):
+        self.metashape_major_version = ".".join(Metashape.app.version.split('.')[:2])
+    
     def print_paths(self):
         print(f"[EasyAMS] Platform: {self.system}")
-        print(f"[EasyAMS] Metashape Buildin Python Executable Path: {self.ms_python_executable_path}")
-        print(f"[EasyAMS] User Plugin Script Path: {self.user_script_path}")
-        print(f"[EasyAMS] Current Installer Path: {self.installer_script_folder}")
+        print(f"[EasyAMS] Metashape Buildin Python Executable Path: {self.metashape_python_executable_path}")
+        print(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
+        print(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
+
+    def create_venv(self):
+        import subprocess
+        cmd = [
+            self.metashape_python_executable_path,
+            "-m",
+            "venv",
+            self.easyams_venv_folder
+        ]
+
+        # remove existing venv folder
+        if os.path.exists(self.easyams_venv_folder):
+            shutil.rmtree(self.easyams_venv_folder)
+
+        try:
+            result = subprocess.run(cmd, check=True, text=True, capture_output=True)
+            print("[EasyAMS] virtual isolated python venv created")
+
+        except subprocess.CalledProcessError as e:
+            print("[EasyAMS] creating virtual isolated python venv failed")
+            print(" :returncode:", e.returncode)
+            print(" :stderr:", e.stderr)
+
+    def venv_ready(self):
+        if not os.path.exists(self.easyams_venv_folder):
+            return False
+        
+        pyvenv_cfg_path = os.path.join(self.easyams_venv_folder, "pyvenv.cfg")
+        if not os.path.exists(pyvenv_cfg_path):
+            return False
+        
+        with open(pyvenv_cfg_path, "r") as f:
+            content = f.readlines()
+            for line in content:
+                # 检查是否包含 Python 版本信息
+                if line.startswith("version"):
+                    self.easyams_venv_python_version = line.split("=")[1].strip()
+
+        if self.easyams_venv_python_version == self.metashape_python_version:
+            self.easyams_venv_python_executable_path = os.path.join(self.easyams_venv_python_executable_path, "bin", "python")
+            return True
+        else:
+            Metashape.app.messageBox(
+                f"[EasyAMS] venv python version ({self.easyams_venv_python_version}) "
+                f"does not match with metashape python version {self.metashape_python_version}")
+            return False
+
 
 def path_equal(path1, path2):
     # 获取路径的绝对规范化形式
@@ -47,6 +106,8 @@ def path_equal(path1, path2):
     return abs_path1 == abs_path2
 
 def show_about_dialog():
+    from PySide2 import QtWidgets, QtGui, QtCore
+
     # 创建主对话框
     dialog = QtWidgets.QDialog()
     dialog.setWindowTitle("About EasyAMS")
@@ -110,15 +171,20 @@ def show_about_dialog():
     dialog.exec_()
 
 if __name__ == "__main__":
-    inst = Installer()
+    env = Installer()
 
-    if path_equal(inst.installer_script_folder, inst.user_script_path):
-        # the installer is inside the metashape script launcher folder, functions installed correctly.
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", inst.print_paths)
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", inst.print_paths)
+    if path_equal(env.easyams_installer_folder, env.metashape_user_script_folder):
+        # the installer is installed correctly (inside the metashape script launcher folder)
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", env.print_paths)
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", env.print_paths)
         Metashape.app.addMenuSeparator("EasyAMS")
-        Metashape.app.addMenuItem("EasyAMS/Check for Updates", inst.print_paths)
+        Metashape.app.addMenuItem("EasyAMS/Check for Updates", env.print_paths)
         Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
     else:
         print("[EasyAMS] Installing the plugin...")
-        inst.print_paths()
+
+        # create virtual envs
+        if not env.venv_ready():
+            env.create_venv()
+
+        env.print_paths()
