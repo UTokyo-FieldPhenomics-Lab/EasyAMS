@@ -2,6 +2,7 @@ import os
 import sys
 import platform
 import shutil
+import subprocess
 
 import Metashape
 
@@ -26,6 +27,10 @@ class Installer:
             os.makedirs(self.easyams_plugin_folder)
 
         self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
+
+        # install status checker
+        self.venv_is_ready = False
+        self.dependencies_is_ready = False
 
     def get_metashape_scripts_path(self):
 
@@ -53,7 +58,6 @@ class Installer:
         print(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
 
     def create_venv(self):
-        import subprocess
         cmd = [
             self.metashape_python_executable_path,
             "-m",
@@ -90,13 +94,66 @@ class Installer:
                     self.easyams_venv_python_version = line.split("=")[1].strip()
 
         if self.easyams_venv_python_version == self.metashape_python_version:
-            self.easyams_venv_python_executable_path = os.path.join(self.easyams_venv_python_executable_path, "bin", "python")
+            self.easyams_venv_python_executable_path = os.path.join(self.easyams_venv_folder, "bin", "python")
+            self.venv_is_ready = True
             return True
         else:
             Metashape.app.messageBox(
                 f"[EasyAMS] venv python version ({self.easyams_venv_python_version}) "
                 f"does not match with metashape python version {self.metashape_python_version}")
             return False
+        
+    def install_dependencies(self):
+        if self.venv_is_ready:
+            cmd = [
+                self.easyams_venv_python_executable_path,
+                "-m",
+                "pip",
+                "install",
+                "numpy==1.26.4"
+                # "-r",
+                # f"{self.easyams_plugin_folder}"
+            ]
+
+            try:
+                # 使用 Popen 执行命令
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+                # 实时读取标准输出
+                for line in process.stdout:
+                    print(">>> ", line.strip())  # 打印每一行输出
+
+                # 等待命令执行完成
+                process.wait()
+
+                # 检查是否有标准错误输出
+                if process.returncode != 0:
+                    print("[EasyAMS][Error]:")
+                    for line in process.stderr:
+                        print("   ", line.strip())
+
+            except Exception as e:
+                print(f"[EasyAMS][Error] when executing the following command:\n"
+                      f"    {cmd}\n"
+                      f"    {e}")
+
+    def add_venv_to_path(self):
+        if self.venv_is_ready:
+            lib_path = os.path.join(self.easyams_venv_folder, "lib")
+
+            lib_folders = os.listdir(lib_path)
+            if len(lib_folders) == 1:
+                site_packages_folder = os.path.join(lib_path, lib_folders[0], "site-packages")
+                if os.path.exists(site_packages_folder):
+                    sys.path.insert(0, site_packages_folder)
+                else:
+                    Metashape.app.messageBox(
+                        f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
+                    )
+            else:
+                Metashape.app.messageBox(
+                    f"[EasyAMS] Find multiple python libs {lib_folders} at venv folder '{lib_path}'"
+                )
 
 
 def path_equal(path1, path2):
@@ -186,5 +243,10 @@ if __name__ == "__main__":
         # create virtual envs
         if not env.venv_ready():
             env.create_venv()
+
+        if env.venv_is_ready:
+            env.install_dependencies()
+
+            env.add_venv_to_path()
 
         env.print_paths()
