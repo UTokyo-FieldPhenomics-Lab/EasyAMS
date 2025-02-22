@@ -6,6 +6,10 @@ import subprocess
 
 import Metashape
 
+def mprint(*values, **kwargs):
+    print(*values, **kwargs)
+    Metashape.app.update()
+
 class Installer:
 
     def __init__(self):
@@ -16,6 +20,7 @@ class Installer:
 
         # current metashape buildin Python execuatable path
         self.metashape_python_executable_path = sys.executable
+
         # sys.version >>> '3.9.13 (main, Sep  9 2022, 11:31:02) \n[GCC 8.4.0]'
         self.metashape_python_version = sys.version.split(' ')[0] 
 
@@ -37,54 +42,138 @@ class Installer:
         home_dir = os.path.expanduser("~")
 
         if self.system == "Linux":
-            path = os.path.join(home_dir, ".local", "share", "Agisoft", "Metashape Pro", "scripts")
+            script_path = os.path.join(home_dir, ".local", "share", "Agisoft", "Metashape Pro", "scripts")
         elif self.system == "Windows":
-            path = os.path.join(home_dir, "AppData", "Local", "AgiSoft", "Metashape Pro", "scripts")
+            script_path = os.path.join(home_dir, "AppData", "Local", "AgiSoft", "Metashape Pro", "scripts")
         elif self.system == "Darwin":  # macOS
-            path = os.path.join(home_dir, "Library", "Application Support", "Agisoft", "Metashape Pro", "scripts")
+            script_path = os.path.join(home_dir, "Library", "Application Support", "Agisoft", "Metashape Pro", "scripts")
         else:
             Metashape.app.messageBox("[EasyAMS] Unsupported operating system")
             raise OSError("[EasyAMS] Unsupported operating system")
 
-        return path
+        return script_path
     
     def check_campatibility(self):
         self.metashape_major_version = ".".join(Metashape.app.version.split('.')[:2])
     
     def print_paths(self):
-        print(f"[EasyAMS] Platform: {self.system}")
-        print(f"[EasyAMS] Metashape Buildin Python Executable Path: {self.metashape_python_executable_path}")
-        print(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
-        print(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
+        mprint(f"[EasyAMS] Platform: {self.system}")
+        mprint(f"[EasyAMS] Metashape Buildin Python Executable Path: {self.metashape_python_executable_path}")
+        mprint(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
+        mprint(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
 
-    def create_venv(self):
-        cmd = [
-            self.metashape_python_executable_path,
-            "-m",
-            "venv",
-            self.easyams_venv_folder
-        ]
+    def execude_command(self, cmd):
+        mprint(f"[EasyAMS][CMD] {' '.join(cmd)}")
 
-        # remove existing venv folder
-        if os.path.exists(self.easyams_venv_folder):
-            shutil.rmtree(self.easyams_venv_folder)
+        # sys.stdout.reconfigure(encoding='utf-8')
+        # sys.stderr.reconfigure(encoding='utf-8')
 
         try:
-            result = subprocess.run(cmd, check=True, text=True, capture_output=True)
-            print("[EasyAMS] virtual isolated python venv created")
+            # 使用 Popen 执行命令
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
 
-        except subprocess.CalledProcessError as e:
-            print("[EasyAMS] creating virtual isolated python venv failed")
-            print(" :returncode:", e.returncode)
-            print(" :stderr:", e.stderr)
+            # 实时读取标准输出
+            for line in process.stdout:
+                mprint(">>> ", line.strip())  # 打印每一行输出
+
+            # 等待命令执行完成
+            process.wait()
+
+            # 检查是否有标准错误输出
+            if process.returncode != 0:
+                mprint("[EasyAMS][Error]:")
+                for line in process.stderr:
+                    mprint("   ", line.strip())
+                    Metashape.app.update()
+
+                return False
+            else:
+                return True
+
+        except Exception as e:
+            mprint(f"[EasyAMS][Error] when executing the following command:\n"
+                    f"    {cmd}\n"
+                    f"    {e}")
+            return False
+
+    def create_venv(self):
+        mprint("[EasyAMS][Func] Creating virtual environment...")
+
+        if self.system != "Windows":
+            # not windows, just using `python -m venv <venv_folder>` to create venv
+            install_uv_cmd = [
+                self.metashape_python_executable_path,
+                "-m",
+                "venv",
+                self.easyams_venv_folder
+            ]
+
+            # remove existing venv folder
+            if os.path.exists(self.easyams_venv_folder):
+                shutil.rmtree(self.easyams_venv_folder)
+
+
+            is_okay = self.run_command(install_uv_cmd)
+            if is_okay:
+                mprint("[EasyAMS] virtual isolated python venv created")
+            else:
+                mprint("[EasyAMS] virtual isolated python venv creation failed")
+            return is_okay
+        else:
+            # windows metashape build in python has bugs on creating venv, so we use uv instead
+            install_uv_cmd = [
+                self.metashape_python_executable_path,
+                "-m",
+                "pip",
+                "install",
+                "uv"
+            ]
+
+            is_okay = self.execude_command(install_uv_cmd)
+            if is_okay:
+                mprint("[EasyAMS] UV venv manager installed successfully.")
+            else:
+                mprint("[EasyAMS] Failed to install UV venv manager.")
+
+            uv_executable_path = self.metashape_python_executable_path.replace("python.exe", "Scripts/uv.exe")
+            
+            # create venv using uv
+            install_same_py_cmd = [
+                uv_executable_path,
+                "python",
+                "install",
+                self.metashape_python_version
+            ]
+            is_okay = self.execude_command(install_same_py_cmd)
+            if is_okay:
+                mprint("[EasyAMS] python with same version as Metashape installed successfully.")
+            else:
+                mprint("[EasyAMS] Failed to install python same version as Metashape.")
+
+            # create venv using uv
+            create_venv_cmd = [
+                uv_executable_path,
+                "venv",
+                self.easyams_venv_folder.replace("\\", "/"),  # metashape path has spaces
+                "--python",
+                self.metashape_python_version
+            ]
+            is_okay = self.execude_command(create_venv_cmd)
+
+            if is_okay:
+                mprint("[EasyAMS] virtual isolated python venv created")
+            else:
+                mprint("[EasyAMS] virtual isolated python venv creation failed")
+
+            return is_okay
 
     def venv_ready(self):
         if not os.path.exists(self.easyams_venv_folder):
-            return False
+            return self.venv_is_ready
         
         pyvenv_cfg_path = os.path.join(self.easyams_venv_folder, "pyvenv.cfg")
         if not os.path.exists(pyvenv_cfg_path):
-            return False
+            return self.venv_is_ready
         
         with open(pyvenv_cfg_path, "r") as f:
             content = f.readlines()
@@ -94,19 +183,71 @@ class Installer:
                     self.easyams_venv_python_version = line.split("=")[1].strip()
 
         if self.easyams_venv_python_version == self.metashape_python_version:
-            self.easyams_venv_python_executable_path = os.path.join(self.easyams_venv_folder, "bin", "python")
+            if self.system == "Windows":
+                easyams_venv_python_executable_folder = os.path.join(self.easyams_venv_folder, "Scripts")
+                self.easyams_venv_python_executable_file = os.path.join(easyams_venv_python_executable_folder, "python.exe")
+            else:
+                easyams_venv_python_executable_folder = os.path.join(self.easyams_venv_folder, "bin")
+                self.easyams_venv_python_executable_file = os.path.join(easyams_venv_python_executable_folder, "python")
+            
+            self.check_pip_available( easyams_venv_python_executable_folder )
+
             self.venv_is_ready = True
-            return True
+            return self.venv_is_ready
         else:
+            self.venv_is_ready = False
             Metashape.app.messageBox(
                 f"[EasyAMS] venv python version ({self.easyams_venv_python_version}) "
                 f"does not match with metashape python version {self.metashape_python_version}")
-            return False
+            return self.venv_is_ready
+        
+    def check_pip_available(self, pyexe_path):
+        mprint(f'[EasyAMS][Func] Checking pip availability...')
+
+        has_pip = False
+        for exe in os.listdir(pyexe_path):
+            if 'pip' in exe:
+                has_pip = True
+                break
+        
+        if not has_pip:
+            # install pip from curl
+            get_pip_py = os.path.join(self.easyams_plugin_folder, "get-pip.py")
+
+            if not os.path.exists(get_pip_py):
+                curl_cmd = [
+                    "curl",
+                    "--output", 
+                    get_pip_py,
+                    "https://bootstrap.pypa.io/get-pip.py"
+                ]
+
+                is_okay = self.execude_command(curl_cmd)
+                if is_okay and os.path.exists(get_pip_py):
+                    mprint(f'[EasyAMS][Func] get-pip.py downloaded successfully.')
+                else:
+                    mprint(f'[EasyAMS][Error] Failed to download get-pip.py')
+            
+            if os.path.exists(get_pip_py):
+                install_pip_cmd = [
+                    self.easyams_venv_python_executable_file,
+                    get_pip_py
+                ]
+                is_okay = self.execude_command(install_pip_cmd)
+                if is_okay:
+                    mprint(f'[EasyAMS][Func] pip installed successfully.')
+                else:
+                    mprint(f'[EasyAMS][Error] Failed to install pip')
+            
         
     def install_dependencies(self):
-        if self.venv_is_ready:
+        mprint(f'[EasyAMS][Func] Installing dependencies...')
+
+        # todo: need check if the dependencies are already installed
+
+        if self.venv_is_ready or self.venv_ready():
             cmd = [
-                self.easyams_venv_python_executable_path,
+                self.easyams_venv_python_executable_file,
                 "-m",
                 "pip",
                 "install",
@@ -115,49 +256,42 @@ class Installer:
                 # f"{self.easyams_plugin_folder}"
             ]
 
-            try:
-                # 使用 Popen 执行命令
-                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-                # 实时读取标准输出
-                for line in process.stdout:
-                    print(">>> ", line.strip())  # 打印每一行输出
-
-                # 等待命令执行完成
-                process.wait()
-
-                # 检查是否有标准错误输出
-                if process.returncode != 0:
-                    print("[EasyAMS][Error]:")
-                    for line in process.stderr:
-                        print("   ", line.strip())
-
-            except Exception as e:
-                print(f"[EasyAMS][Error] when executing the following command:\n"
-                      f"    {cmd}\n"
-                      f"    {e}")
+            is_okay = self.execude_command(cmd)
+            if is_okay:
+                mprint("[EasyAMS] Dependencies installed successfully.")
+            else:
+                mprint("[EasyAMS] Failed to install dependencies.")
 
     def add_venv_to_path(self):
-        if self.venv_is_ready:
-            lib_path = os.path.join(self.easyams_venv_folder, "lib")
+        mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
 
-            lib_folders = os.listdir(lib_path)
-            if len(lib_folders) == 1:
-                site_packages_folder = os.path.join(lib_path, lib_folders[0], "site-packages")
-                if os.path.exists(site_packages_folder):
-                    sys.path.insert(0, site_packages_folder)
+        if self.venv_is_ready or self.venv_ready():
+
+            if self.system == 'Windows':
+                # Add the Scripts directory to PATH
+                site_packages_folder  = os.path.join(self.easyams_venv_folder, "Lib", "site-packages")
+
+            else:
+                lib_path = os.path.join(self.easyams_venv_folder, "lib")
+
+                # exclude the ".DS_Store" and other non-python folders
+                lib_folders = [i for i in os.listdir(lib_path) if "python" in i]
+                if len(lib_folders) == 1:
+                    site_packages_folder = os.path.join(lib_path, lib_folders[0], "site-packages")
                 else:
                     Metashape.app.messageBox(
-                        f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
+                        f"[EasyAMS] Find multiple python libs {lib_folders} at venv folder '{lib_path}'"
                     )
+
+            if os.path.exists(site_packages_folder):
+                sys.path.insert(0, site_packages_folder)
             else:
                 Metashape.app.messageBox(
-                    f"[EasyAMS] Find multiple python libs {lib_folders} at venv folder '{lib_path}'"
+                    f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
 
 
 def path_equal(path1, path2):
-    # 获取路径的绝对规范化形式
     abs_path1 = os.path.abspath(os.path.normpath(path1))
     abs_path2 = os.path.abspath(os.path.normpath(path2))
     return abs_path1 == abs_path2
@@ -238,13 +372,13 @@ if __name__ == "__main__":
         Metashape.app.addMenuItem("EasyAMS/Check for Updates", env.print_paths)
         Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
     else:
-        print("[EasyAMS] Installing the plugin...")
+        mprint("[EasyAMS] Installing the plugin...")
 
         # create virtual envs
         if not env.venv_ready():
             env.create_venv()
 
-        if env.venv_is_ready:
+        if env.venv_is_ready or env.venv_ready():
             env.install_dependencies()
 
             env.add_venv_to_path()
