@@ -122,6 +122,19 @@ class Installer:
                     f"    {cmd}\n"
                     f"    {e}")
             return False
+        
+    @staticmethod
+    def uv_installed_in_ms_python():
+        import pkg_resources
+        try:
+            # Parse the dependency (e.g., "numpy==1.26.4" or "shapely>=2.0.0")
+            # Check if the installed version satisfies the requirement
+            pkg_resources.require('uv')
+            print(f"[EasyAMS] uv is installed in Metashape buildin python.")
+            return True
+        except pkg_resources.DistributionNotFound:
+            print(f"[EasyAMS] uv is not installed in Metashape buildin python.")
+            return False
 
     def create_venv(self):
         mprint("[EasyAMS][Func] Creating virtual environment...")
@@ -148,19 +161,22 @@ class Installer:
             return is_okay
         else:
             # windows metashape build in python has bugs on creating venv, so we use uv instead
-            install_uv_cmd = [
-                self.metashape_python_executable_path,
-                "-m",
-                "pip",
-                "install",
-                "uv"
-            ]
+            if not self.uv_installed_in_ms_python():
 
-            is_okay = self.execude_command(install_uv_cmd)
-            if is_okay:
-                mprint("[EasyAMS] UV venv manager installed successfully.")
-            else:
-                mprint("[EasyAMS] Failed to install UV venv manager.")
+                install_uv_cmd = [
+                    self.metashape_python_executable_path,
+                    "-m",
+                    "pip",
+                    "install",
+                    "uv"
+                ]
+
+                is_okay = self.execude_command(install_uv_cmd)
+                if is_okay:
+                    mprint("[EasyAMS] UV venv manager installed successfully.")
+                else:
+                    mprint("[EasyAMS] Failed to install UV venv manager.")
+                    return False
 
             uv_executable_path = self.metashape_python_executable_path.replace("python.exe", "Scripts/uv.exe")
             
@@ -394,6 +410,7 @@ class Installer:
             is_okay = self.execude_command(cmd)
             if is_okay:
                 mprint("[EasyAMS] Dependencies installed successfully.")
+                Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
             else:
                 mprint("[EasyAMS] Failed to install dependencies.")
 
