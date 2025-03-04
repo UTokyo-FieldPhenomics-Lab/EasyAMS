@@ -1,7 +1,7 @@
 import fire
 
-from sahi.utils.coco import Coco
-from sahi.utils.file import Path, increment_path
+from sahi_onnx.utils.coco import Coco
+from sahi_onnx.utils.file import Path, increment_path
 
 
 def main(

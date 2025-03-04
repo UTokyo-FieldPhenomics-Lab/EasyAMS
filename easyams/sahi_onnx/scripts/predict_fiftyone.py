@@ -1,6 +1,6 @@
 import fire
 
-from sahi.predict import predict_fiftyone
+from sahi_onnx.predict import predict_fiftyone
 
 
 def main():

@@ -5,9 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from sahi.prediction import ObjectPrediction
-from sahi.utils.import_utils import is_available
-from sahi.utils.torch import select_device as select_torch_device
+from sahi_onnx.prediction import ObjectPrediction
+from sahi_onnx.utils.import_utils import is_available
 
 
 class DetectionModel:
@@ -58,7 +57,8 @@ class DetectionModel:
         self._original_predictions = None
         self._object_prediction_list_per_image = None
 
-        self.set_device()
+        if is_available('torch'):
+            self.set_device()
 
         # automatically load model if load_at_init is True
         if load_at_init:
@@ -105,7 +105,7 @@ class DetectionModel:
         """
         self.model = None
         if is_available("torch"):
-            from sahi.utils.torch import empty_cuda_cache
+            from sahi_onnx.utils.torch import empty_cuda_cache
 
             empty_cuda_cache()
 

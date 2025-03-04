@@ -6,15 +6,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
-import torch
 
 logger = logging.getLogger(__name__)
 
-from sahi.models.base import DetectionModel
-from sahi.prediction import ObjectPrediction
-from sahi.utils.compatibility import fix_full_shape_list, fix_shift_amount_list
-from sahi.utils.import_utils import check_requirements
-from sahi.utils.yolov8onnx import non_max_supression, xywh2xyxy
+from sahi_onnx.models.base import DetectionModel
+from sahi_onnx.prediction import ObjectPrediction
+from sahi_onnx.utils.compatibility import fix_full_shape_list, fix_shift_amount_list
+from sahi_onnx.utils.import_utils import check_requirements
+from sahi_onnx.utils.yolov8onnx import non_max_supression, xywh2xyxy
 
 
 class Yolov8OnnxDetectionModel(DetectionModel):
@@ -39,10 +38,12 @@ class Yolov8OnnxDetectionModel(DetectionModel):
         import onnxruntime
 
         try:
-            if self.device == torch.device("cpu"):
-                EP_list = ["CPUExecutionProvider"]
-            else:
-                EP_list = ["CUDAExecutionProvider"]
+            # if self.device == torch.device("cpu"):
+            #     EP_list = ["CPUExecutionProvider"]
+            # else:
+            #     EP_list = ["CUDAExecutionProvider"]
+
+            EP_list = ["CPUExecutionProvider"]
 
             options = onnxruntime.SessionOptions()
 
@@ -88,7 +89,7 @@ class Yolov8OnnxDetectionModel(DetectionModel):
 
     def _post_process(
         self, outputs: np.ndarray, input_shape: Tuple[int, int], image_shape: Tuple[int, int]
-    ) -> List[torch.Tensor]:
+    ) -> List[np.ndarray]:
         image_h, image_w = image_shape
         input_w, input_h = input_shape
 
@@ -121,8 +122,7 @@ class Yolov8OnnxDetectionModel(DetectionModel):
             cls_id = int(label)
             prediction_result.append([bbox[0], bbox[1], bbox[2], bbox[3], score, cls_id])
 
-        prediction_result = [torch.tensor(prediction_result)]
-        # prediction_result = [prediction_result]
+        prediction_result = [np.asarray(prediction_result)]
 
         return prediction_result
 
@@ -208,7 +208,8 @@ class Yolov8OnnxDetectionModel(DetectionModel):
             object_prediction_list = []
 
             # process predictions
-            for prediction in image_predictions_in_xyxy_format.cpu().detach().numpy():
+            # for prediction in image_predictions_in_xyxy_format.cpu().detach().numpy():
+            for prediction in image_predictions_in_xyxy_format: # already numpy array
                 x1 = prediction[0]
                 y1 = prediction[1]
                 x2 = prediction[2]

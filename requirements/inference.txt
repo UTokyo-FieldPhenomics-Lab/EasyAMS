@@ -9,15 +9,13 @@ opencv-python==4.10.0.84
 onnx==1.17.0
 onnxruntime==1.19.2
 
-# modified sahi package for inferencing, thus no need ultralytics framework for inferencing
+# modified sahi package for inferencing, thus no need ultralytics, torch framework for inferencing
 # sahi==0.11.20
 # ultralytics==8.3.77
+# torch==2.5.1
+# torchvision==0.20.1
 shapely>=2.0.0
 tqdm>=4.48.2
 pillow>=8.2.0
 pybboxes==0.1.6
 requests==2.32.3
-
-# required torch
-torch==2.5.1
-torchvision==0.20.1

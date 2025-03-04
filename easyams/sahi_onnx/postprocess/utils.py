@@ -2,13 +2,13 @@ from collections.abc import Sequence
 from typing import List, Union
 
 import numpy as np
-import torch
+# import torch
 from shapely.geometry import MultiPolygon, Polygon
 
-from sahi.annotation import BoundingBox, Category, Mask
-from sahi.prediction import ObjectPrediction
-from sahi.utils.cv import get_coco_segmentation_from_bool_mask
-from sahi.utils.shapely import ShapelyAnnotation, get_shapely_multipolygon
+from sahi_onnx.annotation import BoundingBox, Category, Mask
+from sahi_onnx.prediction import ObjectPrediction
+from sahi_onnx.utils.cv import get_coco_segmentation_from_bool_mask
+from sahi_onnx.utils.shapely import ShapelyAnnotation, get_shapely_multipolygon
 
 
 class ObjectPredictionList(Sequence):
@@ -17,7 +17,7 @@ class ObjectPredictionList(Sequence):
         super().__init__()
 
     def __getitem__(self, i):
-        if torch.is_tensor(i) or isinstance(i, np.ndarray):
+        if isinstance(i, np.ndarray):
             i = i.tolist()
         if isinstance(i, int):
             return ObjectPredictionList([self.list[i]])
@@ -28,7 +28,7 @@ class ObjectPredictionList(Sequence):
             raise NotImplementedError(f"{type(i)}")
 
     def __setitem__(self, i, elem):
-        if torch.is_tensor(i) or isinstance(i, np.ndarray):
+        if isinstance(i, np.ndarray):
             i = i.tolist()
         if isinstance(i, int):
             self.list[i] = elem
@@ -53,8 +53,8 @@ class ObjectPredictionList(Sequence):
     def extend(self, object_prediction_list):
         self.list.extend(object_prediction_list.list)
 
-    def totensor(self):
-        return object_prediction_list_to_torch(self)
+    # def totensor(self):
+    #     return object_prediction_list_to_torch(self)
 
     def tonumpy(self):
         return object_prediction_list_to_numpy(self)
@@ -66,18 +66,18 @@ class ObjectPredictionList(Sequence):
             return self.list
 
 
-def object_prediction_list_to_torch(object_prediction_list: ObjectPredictionList) -> torch.tensor:
-    """
-    Returns:
-        torch.tensor of size N x [x1, y1, x2, y2, score, category_id]
-    """
-    num_predictions = len(object_prediction_list)
-    torch_predictions = torch.zeros([num_predictions, 6], dtype=torch.float32)
-    for ind, object_prediction in enumerate(object_prediction_list):
-        torch_predictions[ind, :4] = torch.tensor(object_prediction.tolist().bbox.to_xyxy(), dtype=torch.float32)
-        torch_predictions[ind, 4] = object_prediction.tolist().score.value
-        torch_predictions[ind, 5] = object_prediction.tolist().category.id
-    return torch_predictions
+# def object_prediction_list_to_torch(object_prediction_list: ObjectPredictionList) -> torch.tensor:
+#     """
+#     Returns:
+#         torch.tensor of size N x [x1, y1, x2, y2, score, category_id]
+#     """
+#     num_predictions = len(object_prediction_list)
+#     torch_predictions = torch.zeros([num_predictions, 6], dtype=torch.float32)
+#     for ind, object_prediction in enumerate(object_prediction_list):
+#         torch_predictions[ind, :4] = torch.tensor(object_prediction.tolist().bbox.to_xyxy(), dtype=torch.float32)
+#         torch_predictions[ind, 4] = object_prediction.tolist().score.value
+#         torch_predictions[ind, 5] = object_prediction.tolist().category.id
+#     return torch_predictions
 
 
 def object_prediction_list_to_numpy(object_prediction_list: ObjectPredictionList) -> np.ndarray:

@@ -2,8 +2,8 @@ import os
 
 import fire
 
-from sahi.slicing import slice_coco
-from sahi.utils.file import Path, save_json
+from sahi_onnx.slicing import slice_coco
+from sahi_onnx.utils.file import Path, save_json
 
 
 def slice(

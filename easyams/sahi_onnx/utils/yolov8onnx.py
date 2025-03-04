@@ -3,25 +3,10 @@ from typing import Optional
 
 import numpy as np
 
-from sahi.utils.ultralytics import download_yolov8n_model
-
 
 class Yolov8ONNXTestConstants:
     YOLOV8N_ONNX_MODEL_PATH = "tests/data/models/yolov8/yolov8n.onnx"
 
-
-def download_yolov8n_onnx_model(destination_path: Optional[str] = None, image_size: Optional[int] = 640):
-    if destination_path is None:
-        destination_path = Yolov8ONNXTestConstants.YOLOV8N_ONNX_MODEL_PATH
-
-    destination_path = Path(destination_path)
-    model_path = destination_path.parent / (destination_path.stem + ".pt")
-    download_yolov8n_model(model_path)
-
-    from ultralytics import YOLO
-
-    model = YOLO(model_path)
-    model.export(format="onnx")  # , imgsz=image_size)
 
 
 def non_max_supression(boxes: np.ndarray, scores: np.ndarray, iou_threshold: float) -> np.ndarray:

@@ -6,30 +6,24 @@ import os
 import time
 from typing import List, Optional
 
-from sahi.utils.import_utils import is_available
-
-# https://github.com/obss/sahi/issues/526
-if is_available("torch"):
-    import torch
+from sahi_onnx.utils.import_utils import is_available
 
 from functools import cmp_to_key
 
 import numpy as np
 from tqdm import tqdm
 
-from sahi.auto_model import AutoDetectionModel
-from sahi.models.base import DetectionModel
-from sahi.postprocess.combine import (
+from sahi_onnx.auto_model import AutoDetectionModel
+from sahi_onnx.models.base import DetectionModel
+from sahi_onnx.postprocess.combine import (
     GreedyNMMPostprocess,
-    LSNMSPostprocess,
-    NMMPostprocess,
-    NMSPostprocess,
     PostprocessPredictions,
 )
-from sahi.prediction import ObjectPrediction, PredictionResult
-from sahi.slicing import slice_image
-from sahi.utils.coco import Coco, CocoImage
-from sahi.utils.cv import (
+
+from sahi_onnx.prediction import ObjectPrediction, PredictionResult
+from sahi_onnx.slicing import slice_image
+from sahi_onnx.utils.coco import Coco, CocoImage
+from sahi_onnx.utils.cv import (
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
     crop_object_predictions,
@@ -38,14 +32,11 @@ from sahi.utils.cv import (
     read_image_as_pil,
     visualize_object_predictions,
 )
-from sahi.utils.file import Path, increment_path, list_files, save_json, save_pickle
-from sahi.utils.import_utils import check_requirements
+from sahi_onnx.utils.file import Path, increment_path, list_files, save_json, save_pickle
+from sahi_onnx.utils.import_utils import check_requirements
 
 POSTPROCESS_NAME_TO_CLASS = {
     "GREEDYNMM": GreedyNMMPostprocess,
-    "NMM": NMMPostprocess,
-    "NMS": NMSPostprocess,
-    "LSNMS": LSNMSPostprocess,
 }
 
 LOW_MODEL_CONFIDENCE = 0.1
