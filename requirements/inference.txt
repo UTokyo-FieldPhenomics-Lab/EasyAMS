@@ -9,8 +9,8 @@ opencv-python==4.10.0.84
 onnx==1.17.0
 onnxruntime==1.19.2
 
-# sahi src requirements.txt
-# sahi==0.11.20 not used for inferencing, thus remove ultralytics framework
+# modified sahi package for inferencing, thus no need ultralytics framework for inferencing
+# sahi==0.11.20
 # ultralytics==8.3.77
 shapely>=2.0.0
 tqdm>=4.48.2

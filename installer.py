@@ -4,7 +4,35 @@ import platform
 import shutil
 import subprocess
 
+from packaging import version
+
 import Metashape
+
+REQUIREMENTS_INFERENCE = """
+# opencv numpy requirements
+numpy==1.26.4
+
+# stag
+stag-python==1.1.0
+opencv-python==4.10.0.84
+
+# inference
+onnx==1.17.0
+onnxruntime==1.19.2
+
+# modified sahi package for inferencing, thus no need ultralytics framework for inferencing
+# sahi==0.11.20
+# ultralytics==8.3.77
+shapely>=2.0.0
+tqdm>=4.48.2
+pillow>=8.2.0
+pybboxes==0.1.6
+requests==2.32.3
+
+# required torch
+torch==2.5.1
+torchvision==0.20.1
+"""
 
 def mprint(*values, **kwargs):
     print(*values, **kwargs)
@@ -35,7 +63,11 @@ class Installer:
 
         # install status checker
         self.venv_is_ready = False
-        self.dependencies_is_ready = False
+
+        self.required_packages = self.parse_requirements(REQUIREMENTS_INFERENCE)
+        self.installed_packages = {}   # {'package': version, ...}
+        self.not_installed_packages = []  # 'package==version' for pip command
+        self.package_is_ready = False
 
     def get_metashape_scripts_path(self):
 
@@ -44,7 +76,7 @@ class Installer:
         if self.system == "Linux":
             script_path = os.path.join(home_dir, ".local", "share", "Agisoft", "Metashape Pro", "scripts")
         elif self.system == "Windows":
-            script_path = os.path.join(home_dir, "AppData", "Local", "AgiSoft", "Metashape Pro", "scripts")
+            script_path = os.path.join(home_dir, "AppData", "Local", "Agisoft", "Metashape Pro", "scripts")
         elif self.system == "Darwin":  # macOS
             script_path = os.path.join(home_dir, "Library", "Application Support", "Agisoft", "Metashape Pro", "scripts")
         else:
@@ -64,9 +96,6 @@ class Installer:
 
     def execude_command(self, cmd):
         mprint(f"[EasyAMS][CMD] {' '.join(cmd)}")
-
-        # sys.stdout.reconfigure(encoding='utf-8')
-        # sys.stderr.reconfigure(encoding='utf-8')
 
         try:
             # 使用 Popen 执行命令
@@ -238,22 +267,130 @@ class Installer:
                     mprint(f'[EasyAMS][Func] pip installed successfully.')
                 else:
                     mprint(f'[EasyAMS][Error] Failed to install pip')
-            
+
+    # 提取非注释的依赖项
+    @staticmethod
+    def parse_requirements(requirements_str):
+        dependencies = []
+        for line in requirements_str.splitlines():
+            line = line.strip()
+            # 忽略空行和注释行
+            if line and not line.startswith("#"):
+                dependencies.append(line)
+        return dependencies
+    
+    def get_venv_installed_package_info(self):
+        """
+        Get a dictionary of installed packages and their versions in the specified virtual environment.
+
+        :param venv_python_path: The path to the Python executable in the virtual environment.
+        :return: A dictionary where keys are package names and values are their installed versions.
+        """
+        try:
+            # Use `pip list` to get all installed packages and their versions
+            result = subprocess.run(
+                [
+                    self.easyams_venv_python_executable_file, 
+                    "-m", "pip", "list", "--format=freeze"
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"[EasyAMS] Failed to get installed packages: {result.stderr}")
+
+            # Parse the output of `pip list`
+            self.installed_packages = {}
+            for line in result.stdout.splitlines():
+                if "==" in line:  # Only consider lines with "package==version"
+                    package, version = line.split("==")
+                    self.installed_packages[package.lower()] = version
+        except Exception as e:
+            mprint(f"[EasyAMS] Error while getting installed packages: {e}")
+            self.installed_packages = {}
+
+    # Check if a dependency is installed with the correct version
+    def check_one_package_in_venv(self, dependency):
+        """
+        Check if a dependency is installed and meets the required version.
+
+        :param dependency: The dependency string (e.g., "numpy==1.26.4" or "shapely>=2.0.0").
+        :param installed_packages: A dictionary of installed packages and their versions.
+        :return: True if the dependency is installed and meets the required version, False otherwise.
+        """
+
+        try:
+            # Parse the dependency (e.g., "numpy==1.26.4" or "shapely>=2.0.0")
+            # only == and >= are supported in EasyAMS requirements.txt
+            if "==" in dependency:
+                package, required_version = dependency.split("==")
+                package = package.lower()
+                if package in self.installed_packages.keys():
+                    installed_version = self.installed_packages[package]
+                    if version.parse(installed_version) == version.parse(required_version):
+                        mprint(f">>> {dependency} is installed and meets the required version.")
+                        return True
+                    else:
+                        mprint(f">>> {dependency} is installed, but the version is {installed_version} (required: {required_version}).")
+                        return False
+                else:
+                    mprint(f">>> {dependency} is not installed.")
+                    return False
+            elif ">=" in dependency:
+                package, required_version = dependency.split(">=")
+                package = package.lower()
+                if package in self.installed_packages:
+                    installed_version = self.installed_packages[package]
+                    if version.parse(installed_version) >= version.parse(required_version):
+                        mprint(f">>> {dependency} is installed and meets the required version.")
+                        return True
+                    else:
+                        mprint(f">>> {dependency} is installed, but the version is {installed_version} (required: >= {required_version}).")
+                        return False
+                else:
+                    mprint(f">>> {dependency} is not installed.")
+                    return False
+            else:
+                package = dependency.lower()
+                if package in self.installed_packages.keys():
+                    mprint(f">>> {dependency} is installed (no specific version requirement).")
+                    return True
+                else:
+                    mprint(f">>> {dependency} is not installed.")
+                    return False
+        except Exception as e:
+            mprint(f"[EasyAMS][func] Error checking dependency {dependency}: {e}")
+            return False
+        
+    def check_dependencies(self):
+        self.get_venv_installed_package_info()
+
+        for dependency in self.required_packages:
+            if not self.check_one_package_in_venv(dependency):
+                self.not_installed_packages.append(dependency)
+
+        if len(self.not_installed_packages) > 0:
+            self.package_is_ready = False
+            mprint(f"[EasyAMS][Func] Dependencies not satisfied")
+            return False
+        else:
+            self.package_is_ready = True
+            mprint(f"[EasyAMS][Func] Dependencies satisfied")
+            return True
         
     def install_dependencies(self):
         mprint(f'[EasyAMS][Func] Installing dependencies...')
 
-        # todo: need check if the dependencies are already installed
-
         if self.venv_is_ready or self.venv_ready():
+            Metashape.app.messageBox("During EasyAMS installation, the Metashape UI may stuck for a while, please wait patiently until finished.")
+
             cmd = [
                 self.easyams_venv_python_executable_file,
                 "-m",
                 "pip",
                 "install",
-                "numpy==1.26.4"
-                # "-r",
-                # f"{self.easyams_plugin_folder}"
+                *self.not_installed_packages
             ]
 
             is_okay = self.execude_command(cmd)
@@ -289,6 +426,18 @@ class Installer:
                 Metashape.app.messageBox(
                     f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
+
+    def main(self):
+        mprint("[EasyAMS] Initializing the plugin...")
+        # create virtual envs
+        if not self.venv_ready():
+            self.create_venv()
+
+        if self.venv_is_ready or self.venv_ready():
+            if not self.check_dependencies():
+                self.install_dependencies()
+
+            self.add_venv_to_path()
 
 
 def path_equal(path1, path2):
@@ -362,25 +511,15 @@ def show_about_dialog():
     dialog.exec_()
 
 if __name__ == "__main__":
-    env = Installer()
+    installer = Installer()
 
-    if path_equal(env.easyams_installer_folder, env.metashape_user_script_folder):
+    if path_equal(installer.easyams_installer_folder, installer.metashape_user_script_folder):
         # the installer is installed correctly (inside the metashape script launcher folder)
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", env.print_paths)
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", env.print_paths)
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", installer.print_paths)
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
         Metashape.app.addMenuSeparator("EasyAMS")
-        Metashape.app.addMenuItem("EasyAMS/Check for Updates", env.print_paths)
+        Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
         Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
     else:
-        mprint("[EasyAMS] Installing the plugin...")
-
-        # create virtual envs
-        if not env.venv_ready():
-            env.create_venv()
-
-        if env.venv_is_ready or env.venv_ready():
-            env.install_dependencies()
-
-            env.add_venv_to_path()
-
-        env.print_paths()
+        installer.main()
+        installer.print_paths()
