@@ -153,7 +153,7 @@ class Installer:
                 shutil.rmtree(self.easyams_venv_folder)
 
 
-            is_okay = self.run_command(install_uv_cmd)
+            is_okay = self.execude_command(install_uv_cmd)
             if is_okay:
                 mprint("[EasyAMS] virtual isolated python venv created")
             else:
