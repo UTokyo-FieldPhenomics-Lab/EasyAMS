@@ -6,13 +6,13 @@ from typing import Dict, List, Optional
 
 import numpy as np
 
-from sahi_onnx.utils.coco import CocoAnnotation, CocoPrediction
-from sahi_onnx.utils.cv import (
+from easyams.sahi_onnx.utils.coco import CocoAnnotation, CocoPrediction
+from easyams.sahi_onnx.utils.cv import (
     get_bbox_from_coco_segmentation,
     get_bool_mask_from_coco_segmentation,
     get_coco_segmentation_from_bool_mask,
 )
-from sahi_onnx.utils.shapely import ShapelyAnnotation
+from easyams.sahi_onnx.utils.shapely import ShapelyAnnotation
 
 
 class BoundingBox:

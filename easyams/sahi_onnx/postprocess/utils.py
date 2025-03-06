@@ -5,10 +5,10 @@ import numpy as np
 # import torch
 from shapely.geometry import MultiPolygon, Polygon
 
-from sahi_onnx.annotation import BoundingBox, Category, Mask
-from sahi_onnx.prediction import ObjectPrediction
-from sahi_onnx.utils.cv import get_coco_segmentation_from_bool_mask
-from sahi_onnx.utils.shapely import ShapelyAnnotation, get_shapely_multipolygon
+from easyams.sahi_onnx.annotation import BoundingBox, Category, Mask
+from easyams.sahi_onnx.prediction import ObjectPrediction
+from easyams.sahi_onnx.utils.cv import get_coco_segmentation_from_bool_mask
+from easyams.sahi_onnx.utils.shapely import ShapelyAnnotation, get_shapely_multipolygon
 
 
 class ObjectPredictionList(Sequence):

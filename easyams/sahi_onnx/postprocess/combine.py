@@ -2,9 +2,9 @@ import logging
 from typing import List
 import numpy as np
 
-from sahi_onnx.postprocess.utils import ObjectPredictionList, has_match, merge_object_prediction_pair
-from sahi_onnx.prediction import ObjectPrediction
-from sahi_onnx.utils.import_utils import check_requirements
+from easyams.sahi_onnx.postprocess.utils import ObjectPredictionList, has_match, merge_object_prediction_pair
+from easyams.sahi_onnx.prediction import ObjectPrediction
+from easyams.sahi_onnx.utils.import_utils import check_requirements
 
 logger = logging.getLogger(__name__)
 

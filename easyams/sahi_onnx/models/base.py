@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from sahi_onnx.prediction import ObjectPrediction
-from sahi_onnx.utils.import_utils import is_available
+from easyams.sahi_onnx.prediction import ObjectPrediction
+from easyams.sahi_onnx.utils.import_utils import is_available
 
 
 class DetectionModel:
@@ -105,7 +105,7 @@ class DetectionModel:
         """
         self.model = None
         if is_available("torch"):
-            from sahi_onnx.utils.torch import empty_cuda_cache
+            from easyams.sahi_onnx.utils.torch import empty_cuda_cache
 
             empty_cuda_cache()
 

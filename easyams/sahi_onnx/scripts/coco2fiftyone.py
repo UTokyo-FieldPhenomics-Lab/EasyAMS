@@ -4,7 +4,7 @@ from typing import List
 
 import fire
 
-from sahi_onnx.utils.file import load_json
+from easyams.sahi_onnx.utils.file import load_json
 
 
 def main(
@@ -23,7 +23,7 @@ def main(
 
     from fiftyone.utils.coco import add_coco_labels
 
-    from sahi_onnx.utils.fiftyone import create_fiftyone_dataset_from_coco_file, fo
+    from easyams.sahi_onnx.utils.fiftyone import create_fiftyone_dataset_from_coco_file, fo
 
     coco_result_list = []
     result_name_list = []

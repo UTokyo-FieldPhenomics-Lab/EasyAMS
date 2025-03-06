@@ -1,6 +1,6 @@
 import fire
 
-from sahi_onnx.predict import predict_fiftyone
+from easyams.sahi_onnx.predict import predict_fiftyone
 
 
 def main():

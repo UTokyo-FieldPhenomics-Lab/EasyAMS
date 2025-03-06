@@ -13,10 +13,10 @@ from PIL import Image
 from shapely.errors import TopologicalError
 from tqdm import tqdm
 
-from sahi_onnx.annotation import BoundingBox, Mask
-from sahi_onnx.utils.coco import Coco, CocoAnnotation, CocoImage, create_coco_dict
-from sahi_onnx.utils.cv import IMAGE_EXTENSIONS_LOSSLESS, IMAGE_EXTENSIONS_LOSSY, read_image_as_pil
-from sahi_onnx.utils.file import load_json, save_json
+from easyams.sahi_onnx.annotation import BoundingBox, Mask
+from easyams.sahi_onnx.utils.coco import Coco, CocoAnnotation, CocoImage, create_coco_dict
+from easyams.sahi_onnx.utils.cv import IMAGE_EXTENSIONS_LOSSLESS, IMAGE_EXTENSIONS_LOSSY, read_image_as_pil
+from easyams.sahi_onnx.utils.file import load_json, save_json
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

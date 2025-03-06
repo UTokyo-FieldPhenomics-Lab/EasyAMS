@@ -18,8 +18,8 @@ from shapely import GeometryCollection, MultiPolygon, Polygon
 from shapely.validation import make_valid
 from tqdm import tqdm
 
-from sahi_onnx.utils.file import is_colab, load_json, save_json
-from sahi_onnx.utils.shapely import ShapelyAnnotation, box, get_shapely_multipolygon
+from easyams.sahi_onnx.utils.file import is_colab, load_json, save_json
+from easyams.sahi_onnx.utils.shapely import ShapelyAnnotation, box, get_shapely_multipolygon
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -1542,7 +1542,7 @@ class Coco:
         """
         Limits overflowing bounding boxes to image dimensions.
         """
-        from sahi_onnx.slicing import annotation_inside_slice
+        from easyams.sahi_onnx.slicing import annotation_inside_slice
 
         coco = Coco(
             name=self.name,

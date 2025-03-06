@@ -6,24 +6,24 @@ import os
 import time
 from typing import List, Optional
 
-from sahi_onnx.utils.import_utils import is_available
+from easyams.sahi_onnx.utils.import_utils import is_available
 
 from functools import cmp_to_key
 
 import numpy as np
 from tqdm import tqdm
 
-from sahi_onnx.auto_model import AutoDetectionModel
-from sahi_onnx.models.base import DetectionModel
-from sahi_onnx.postprocess.combine import (
+from easyams.sahi_onnx.auto_model import AutoDetectionModel
+from easyams.sahi_onnx.models.base import DetectionModel
+from easyams.sahi_onnx.postprocess.combine import (
     GreedyNMMPostprocess,
     PostprocessPredictions,
 )
 
-from sahi_onnx.prediction import ObjectPrediction, PredictionResult
-from sahi_onnx.slicing import slice_image
-from sahi_onnx.utils.coco import Coco, CocoImage
-from sahi_onnx.utils.cv import (
+from easyams.sahi_onnx.prediction import ObjectPrediction, PredictionResult
+from easyams.sahi_onnx.slicing import slice_image
+from easyams.sahi_onnx.utils.coco import Coco, CocoImage
+from easyams.sahi_onnx.utils.cv import (
     IMAGE_EXTENSIONS,
     VIDEO_EXTENSIONS,
     crop_object_predictions,
@@ -32,8 +32,8 @@ from sahi_onnx.utils.cv import (
     read_image_as_pil,
     visualize_object_predictions,
 )
-from sahi_onnx.utils.file import Path, increment_path, list_files, save_json, save_pickle
-from sahi_onnx.utils.import_utils import check_requirements
+from easyams.sahi_onnx.utils.file import Path, increment_path, list_files, save_json, save_pickle
+from easyams.sahi_onnx.utils.import_utils import check_requirements
 
 POSTPROCESS_NAME_TO_CLASS = {
     "GREEDYNMM": GreedyNMMPostprocess,

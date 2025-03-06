@@ -9,11 +9,11 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-from sahi_onnx.models.base import DetectionModel
-from sahi_onnx.prediction import ObjectPrediction
-from sahi_onnx.utils.compatibility import fix_full_shape_list, fix_shift_amount_list
-from sahi_onnx.utils.import_utils import check_requirements
-from sahi_onnx.utils.yolov8onnx import non_max_supression, xywh2xyxy
+from easyams.sahi_onnx.models.base import DetectionModel
+from easyams.sahi_onnx.prediction import ObjectPrediction
+from easyams.sahi_onnx.utils.compatibility import fix_full_shape_list, fix_shift_amount_list
+from easyams.sahi_onnx.utils.import_utils import check_requirements
+from easyams.sahi_onnx.utils.yolov8onnx import non_max_supression, xywh2xyxy
 
 
 class Yolov8OnnxDetectionModel(DetectionModel):

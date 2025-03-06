@@ -6,9 +6,9 @@ from typing import List
 
 import numpy as np
 
-from sahi_onnx.annotation import BoundingBox, Category, Mask
-from sahi_onnx.postprocess.utils import calculate_area, calculate_box_union, calculate_intersection_area
-from sahi_onnx.prediction import ObjectPrediction
+from easyams.sahi_onnx.annotation import BoundingBox, Category, Mask
+from easyams.sahi_onnx.postprocess.utils import calculate_area, calculate_box_union, calculate_intersection_area
+from easyams.sahi_onnx.prediction import ObjectPrediction
 
 
 class PostprocessPredictions:

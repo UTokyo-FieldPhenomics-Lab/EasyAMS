@@ -1,6 +1,6 @@
 from typing import Any, Dict, Optional
 
-from sahi_onnx.utils.file import import_model_class
+from easyams.sahi_onnx.utils.file import import_model_class
 
 MODEL_TYPE_TO_MODEL_CLASS_NAME = {
     "ultralytics": "UltralyticsDetectionModel",

@@ -219,7 +219,7 @@ def import_model_class(model_type, class_name):
     Returns:
         class_: class with given path
     """
-    module = __import__(f"sahi_onnx.models.{model_type}", fromlist=[class_name])
+    module = __import__(f"easyams.sahi_onnx.models.{model_type}", fromlist=[class_name])
     class_ = getattr(module, class_name)
     return class_
 

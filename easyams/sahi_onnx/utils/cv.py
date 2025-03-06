@@ -12,7 +12,7 @@ import numpy as np
 import requests
 from PIL import Image
 
-from sahi_onnx.utils.file import Path
+from easyams.sahi_onnx.utils.file import Path
 
 IMAGE_EXTENSIONS_LOSSY = [".jpg", ".jpeg"]
 IMAGE_EXTENSIONS_LOSSLESS = [".png", ".tiff", ".bmp"]
