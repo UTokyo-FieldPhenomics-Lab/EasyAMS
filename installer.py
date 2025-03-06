@@ -414,6 +414,26 @@ class Installer:
             else:
                 mprint("[EasyAMS] Failed to install dependencies.")
 
+    def _install_easyams_dev(self):
+
+        if self.venv_is_ready or self.venv_ready():
+
+            cmd = [
+                self.easyams_venv_python_executable_file,
+                "-m",
+                "pip",
+                "install",
+                "-e",
+                self.easyams_installer_folder
+            ]
+
+            is_okay = self.execude_command(cmd)
+            if is_okay:
+                mprint("[EasyAMS] EasyAMS package installed successfully.")
+                Metashape.app.messageBox("EasyAMS successfully installed.")
+            else:
+                mprint("[EasyAMS] Failed to install EasyAMS package.")
+
     def add_venv_to_path(self):
         mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
 
@@ -451,6 +471,9 @@ class Installer:
         if self.venv_is_ready or self.venv_ready():
             if not self.check_dependencies():
                 self.install_dependencies()
+
+            if not self.check_one_package_in_venv('easyams'):
+                self._install_easyams_dev()
 
             self.add_venv_to_path()
 
