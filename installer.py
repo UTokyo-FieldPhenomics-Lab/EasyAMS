@@ -1,7 +1,9 @@
 import os
+import re
 import sys
 import platform
 import shutil
+import hashlib
 import subprocess
 
 from packaging import version
@@ -36,6 +38,11 @@ def mprint(*values, **kwargs):
     print(*values, **kwargs)
     Metashape.app.update()
 
+def path_equal(path1, path2):
+    abs_path1 = os.path.abspath(os.path.normpath(path1))
+    abs_path2 = os.path.abspath(os.path.normpath(path2))
+    return abs_path1 == abs_path2
+
 class Installer:
 
     def __init__(self):
@@ -66,6 +73,15 @@ class Installer:
         self.installed_packages = {}   # {'package': version, ...}
         self.not_installed_packages = []  # 'package==version' for pip command
         self.package_is_ready = False
+
+        # git downloader
+        self.gitdown = GitReleaseDownloader(
+            repo="UTokyo-FieldPhenomics-Lab/EasyAMS",  # 替换为实际的 GitHub 仓库路径
+            save_path=self.easyams_plugin_folder,  # 替换为实际的保存路径
+            file_name="yolo11_stag",  # 文件基础名称
+            suffix="onnx",  # 文件后缀
+            # token="your_github_token"  # 可选：GitHub 个人访问令牌
+        )
 
     def get_metashape_scripts_path(self):
 
@@ -462,6 +478,22 @@ class Installer:
                     f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
 
+    def fetch_onnx_files(self):
+        # 检查是否需要更新
+        is_outdated, local_version, git_version = self.gitdown.outdated()
+        if is_outdated:
+            # 获取本地版本号
+            local_version = self.gitdown.local_version()
+
+            # 获取 GitHub 最新版本号
+            git_version = self.gitdown.git_release_version()
+
+            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{git_version} is available.")
+            self.gitdown.update()
+        else:
+            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is up-to-date.")
+
+
     def main(self):
         mprint("[EasyAMS] Initializing the plugin...")
         # create virtual envs
@@ -477,11 +509,173 @@ class Installer:
 
             self.add_venv_to_path()
 
+            global requests
+            import requests
+            self.fetch_onnx_files()
 
-def path_equal(path1, path2):
-    abs_path1 = os.path.abspath(os.path.normpath(path1))
-    abs_path2 = os.path.abspath(os.path.normpath(path2))
-    return abs_path1 == abs_path2
+
+class GitReleaseDownloader:
+
+    def __init__(self, repo: str, save_path: str, file_name: str, suffix: str, token: str = None):
+        """
+        初始化 GitReleaseDownloader 实例
+        :param repo: GitHub 仓库路径，格式为 "org/repo"
+        :param save_path: 本地保存文件的路径
+        :param file_name: 文件的基础名称（不包含版本号和后缀）
+        :param suffix: 文件后缀（如 "onnx"）
+        :param token: 可选，GitHub 个人访问令牌，用于认证
+        """
+        self.repo = repo
+        self.save_path = save_path
+        self.file_name = file_name
+        self.suffix = suffix
+        self.token = token
+        self.headers = {"Authorization": f"token {token}"} if token else {}
+
+        # 确保保存路径存在
+        if not os.path.exists(save_path):
+            os.makedirs(save_path, exist_ok=True)
+
+    def local_version(self) -> int:
+        """
+        获取本地文件的版本号
+        :return: 本地文件的版本号（整数），如果不存在则返回 0
+        """
+        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
+        files = os.listdir(self.save_path)
+        for file in files:
+            match = pattern.match(file)
+            if match:
+                return int(match.group(1))
+        return 0
+
+    def git_release_version(self) -> int:
+        """
+        获取 GitHub Releases 中最新文件的版本号
+        :return: 最新文件的版本号（整数）
+        """
+        url = f"https://api.github.com/repos/{self.repo}/releases/latest"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch latest release: {response.status_code}, {response.text}")
+
+        release_data = response.json()
+        assets = release_data.get("assets", [])
+        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
+        for asset in assets:
+            match = pattern.match(asset["name"])
+            if match:
+                return int(match.group(1))
+        raise Exception(f"No matching file found in the latest release for pattern: {self.file_name}_v?.{self.suffix}")
+
+    def outdated(self) -> bool:
+        """
+        检查本地文件是否过期
+        :return: 如果本地文件版本低于 GitHub 最新版本，则返回 True，否则返回 False
+        """
+        local_version = self.local_version()
+        git_version = self.git_release_version()
+        return git_version > local_version, local_version, git_version
+
+    def update(self):
+        """
+        更新本地文件到最新版本
+        :raises: 如果下载失败或文件校验失败，则抛出异常
+        """
+        # 获取最新版本号和下载链接
+        url = f"https://api.github.com/repos/{self.repo}/releases/latest"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch latest release: {response.status_code}, {response.text}")
+
+        release_data = response.json()
+        assets = release_data.get("assets", [])
+        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
+        download_url = None
+        latest_version = None
+        sha256_url = None
+
+        for asset in assets:
+            match = pattern.match(asset["name"])
+            if match:
+                latest_version = int(match.group(1))
+                if "sha256" not in asset["name"]:
+                    download_url = asset["browser_download_url"]
+            # 查找 SHA256 校验文件
+            if asset["name"] == f"{self.file_name}_v{latest_version}.sha256":
+                sha256_url = asset["browser_download_url"]
+
+        if not download_url or latest_version is None:
+            raise Exception(f"No matching file found in the latest release for pattern: {self.file_name}_v?.{self.suffix}")
+
+        # 下载文件
+        local_file_path = os.path.join(self.save_path, f"{self.file_name}_v{latest_version}.{self.suffix}")
+        print(f"Downloading {download_url} to {local_file_path} ...")
+        with requests.get(download_url, headers=self.headers, stream=True) as r:
+            if r.status_code != 200:
+                raise Exception(f"Failed to download file: {r.status_code}, {r.text}")
+            with open(local_file_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
+        # 下载并校验 SHA256
+        print("Verifying file integrity using SHA256...")
+        sha256_hash = self._download_sha256(assets, f"{self.file_name}_v{latest_version}.{self.suffix}")
+        if not self._verify_file_sha256(local_file_path, sha256_hash):
+            os.remove(local_file_path)  # 删除下载的无效文件
+            raise Exception("SHA256 verification failed. The downloaded file is corrupted or tampered.")
+        
+        # 删除旧文件
+        self._delete_old_files(latest_version)
+        print(f"Update complete. Latest version: v{latest_version}")
+
+    def _delete_old_files(self, latest_version: int):
+        """
+        删除旧版本的文件
+        :param latest_version: 最新版本号
+        """
+        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
+        files = os.listdir(self.save_path)
+        for file in files:
+            match = pattern.match(file)
+            if match:
+                version = int(match.group(1))
+                if version < latest_version:
+                    old_file_path = os.path.join(self.save_path, file)
+                    os.remove(old_file_path)
+                    print(f"Deleted old file: {old_file_path}")
+
+    def _download_sha256(self, assets, target_file_name: str) -> str:
+        """
+        下载与目标文件同名的 .sha256 文件，并提取 SHA256 校验值
+        :param assets: GitHub Release 的 assets 列表
+        :param target_file_name: 目标文件的名称（如 yolov11_stag_v1.onnx）
+        :return: SHA256 校验值
+        """
+        sha256_file_name = f"{target_file_name}.sha256"
+        for asset in assets:
+            if asset["name"] == sha256_file_name:
+                sha256_url = asset["browser_download_url"]
+                response = requests.get(sha256_url, headers=self.headers)
+                if response.status_code != 200:
+                    raise Exception(f"Failed to download SHA256 file: {response.status_code}, {response.text}")
+                return response.text.strip()
+        raise Exception(f"SHA256 file not found for {target_file_name}")
+
+    def _verify_file_sha256(self, file_path: str, sha256_hash: str) -> bool:
+        """
+        校验文件的 SHA256 值
+        :param file_path: 文件路径
+        :param sha256_hash: 预期的 SHA256 值
+        :return: 如果校验通过返回 True，否则返回 False
+        """
+        sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                sha256.update(chunk)
+        calculated_hash = sha256.hexdigest()
+        return calculated_hash == sha256_hash
+        
 
 if __name__ == "__main__":
     installer = Installer()
