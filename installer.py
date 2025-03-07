@@ -60,7 +60,11 @@ class Installer:
         # get current script path
         self.easyams_installer_folder = os.path.dirname(os.path.abspath(__file__))
 
-        self.easyams_plugin_folder = os.path.join(self.metashape_user_script_folder, "EasyAMS")
+        self.easyams_plugin_folder = os.path.abspath(
+            os.path.join(
+                self.metashape_user_script_folder, 
+                f"../easyams-packages-py{sys.version_info.major}{sys.version_info.minor}"))
+        
         if not os.path.exists(self.easyams_plugin_folder):
             os.makedirs(self.easyams_plugin_folder)
 
@@ -473,25 +477,34 @@ class Installer:
 
             if os.path.exists(site_packages_folder):
                 sys.path.insert(0, site_packages_folder)
+
+                # link editable easyams folder for dev
+                for item in os.listdir(site_packages_folder):
+                    if item.endswith('.egg-link'):
+                        with open(os.path.join(site_packages_folder, item), 'r') as f:
+                            # .egg-link 文件的第一行是包的路径
+                            package_path = f.readline().strip()
+                            if os.path.exists(package_path):
+                                sys.path.insert(0, package_path)
             else:
                 Metashape.app.messageBox(
                     f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
 
-    def fetch_onnx_files(self):
+    def check_onnx_version(self):
         # 检查是否需要更新
-        is_outdated, local_version, git_version = self.gitdown.outdated()
+        is_outdated, local_version, github_version = self.gitdown.outdated(return_versions=True)
         if is_outdated:
-            # 获取本地版本号
-            local_version = self.gitdown.local_version()
-
-            # 获取 GitHub 最新版本号
-            git_version = self.gitdown.git_release_version()
-
-            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{git_version} is available.")
-            self.gitdown.update()
+            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{github_version} is available.")
+            latest_version = self.gitdown.update()
         else:
             print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is up-to-date.")
+
+    
+    def get_onnx_file(self):
+        latest_version = self.gitdown.local_version()
+
+        return os.path.join(self.easyams_plugin_folder, f"yolo11_stag_v{latest_version}.onnx")
 
 
     def main(self):
@@ -511,7 +524,7 @@ class Installer:
 
             global requests
             import requests
-            self.fetch_onnx_files()
+            self.check_onnx_version()
 
 
 class GitReleaseDownloader:
@@ -568,14 +581,20 @@ class GitReleaseDownloader:
                 return int(match.group(1))
         raise Exception(f"No matching file found in the latest release for pattern: {self.file_name}_v?.{self.suffix}")
 
-    def outdated(self) -> bool:
+    def outdated(self, return_versions=False) -> bool:
         """
         检查本地文件是否过期
         :return: 如果本地文件版本低于 GitHub 最新版本，则返回 True，否则返回 False
         """
         local_version = self.local_version()
-        git_version = self.git_release_version()
-        return git_version > local_version, local_version, git_version
+        github_version = self.git_release_version()
+
+        is_outdated = github_version > local_version
+
+        if return_versions:
+            return is_outdated, local_version, github_version
+        else:
+            return is_outdated
 
     def update(self):
         """
@@ -627,7 +646,9 @@ class GitReleaseDownloader:
         
         # 删除旧文件
         self._delete_old_files(latest_version)
-        print(f"Update complete. Latest version: v{latest_version}")
+        print(f"[EasyAMS] Update complete. Latest version: v{latest_version}")
+
+        return latest_version
 
     def _delete_old_files(self, latest_version: int):
         """
@@ -682,6 +703,8 @@ if __name__ == "__main__":
 
     if path_equal(installer.easyams_installer_folder, installer.metashape_user_script_folder):
         # the installer is installed correctly (inside the metashape script launcher folder)
+        installer.main()
+        
         import easyams as ams
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", installer.print_paths)
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
