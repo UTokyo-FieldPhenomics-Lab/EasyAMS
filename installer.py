@@ -707,7 +707,7 @@ if __name__ == "__main__":
         
         import easyams as ams
 
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", ams.stag.detect_stag_markers)
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", ams.stag_gcp.detect_stag_markers)
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
         Metashape.app.addMenuSeparator("EasyAMS")
         Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
