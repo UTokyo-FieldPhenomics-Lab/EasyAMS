@@ -109,6 +109,38 @@ class DetectMarkersThread:
                 marker_center = marker_center_in_bbox + bbox_offset
                 mprint(f"[EasyAMS] detected Stag HD{self.params['code_bit']}-{marker_id} at ({marker_center[0]}, {marker_center[1]})")
 
+                marker_label = f"StagHD{self.params['code_bit']}-{marker_id}"
+
+                self.place_marker_on_photo(self.chunk, camera, marker_label, marker_center)
+
+
+    def place_marker_on_photo(self, chunk, camera, marker_label, marker_center):
+        """
+        Adds a marker to a Metashape photo with the given label and coordinates.
+        If the marker with the same label already exists, updates its position.
+
+        :param camera: Metashape.Camera object where the marker will be placed.
+        :param marker_label: Label for the marker (string).
+        :param marker_center: Marker coordinates in the photo (tuple of floats, e.g., (x, y)).
+        """
+        # Check if a marker with the same label already exists
+        existing_marker = None
+        for marker in chunk.markers:
+            if marker.label == marker_label:
+                existing_marker = marker
+                break
+
+        if existing_marker:
+            # Update the existing marker's projection
+            existing_marker.projections[camera] = Metashape.Marker.Projection(marker_center, True)
+            print(f"Updated marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
+        else:
+            # Create a new marker
+            marker = chunk.addMarker()
+            marker.label = marker_label
+            marker.projections[camera] = Metashape.Marker.Projection(marker_center, True)
+            print(f"Added new marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
+
 
 class StagYoloDetector:
 
