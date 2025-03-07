@@ -1,4 +1,5 @@
 from PySide2 import QtWidgets, QtGui, QtCore
+import Metashape
 
 def show_about_dialog():
     
@@ -63,3 +64,36 @@ def show_about_dialog():
 
     # 显示对话框
     dialog.exec_()
+
+
+class ProgressDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Detecting Stag Markers")
+        self.resize(400, 150)
+
+        # 总进度条
+        self.total_progress_label = QtWidgets.QLabel("Total Progress:")
+        self.total_progress_bar = QtWidgets.QProgressBar()
+        self.total_progress_bar.setRange(0, 100)
+
+        # 分进度条
+        self.sub_progress_label = QtWidgets.QLabel("Sub Progress:")
+        self.sub_progress_bar = QtWidgets.QProgressBar()
+        self.sub_progress_bar.setRange(0, 100)
+
+        # 布局
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.total_progress_label)
+        layout.addWidget(self.total_progress_bar)
+        layout.addWidget(self.sub_progress_label)
+        layout.addWidget(self.sub_progress_bar)
+        self.setLayout(layout)
+
+    def update_total_progress(self, value):
+        self.total_progress_bar.setValue(value)
+        Metashape.app.update()
+
+    def update_sub_progress(self, value):
+        self.sub_progress_bar.setValue(value)
+        Metashape.app.update()

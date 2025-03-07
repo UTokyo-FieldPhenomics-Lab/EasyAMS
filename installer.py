@@ -703,10 +703,11 @@ if __name__ == "__main__":
 
     if path_equal(installer.easyams_installer_folder, installer.metashape_user_script_folder):
         # the installer is installed correctly (inside the metashape script launcher folder)
-        installer.main()
+        installer.add_venv_to_path()
         
         import easyams as ams
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", installer.print_paths)
+
+        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", ams.stag.detect_stag_markers)
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
         Metashape.app.addMenuSeparator("EasyAMS")
         Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
