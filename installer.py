@@ -707,7 +707,7 @@ if __name__ == "__main__":
         
         import easyams as ams
 
-        Metashape.app.addMenuItem("EasyAMS/Import Videos", ams.video_split.start_video_extractor)
+        Metashape.app.addMenuItem("EasyAMS/batchImport/Import Images", ams.img_loader.create_batch_image_loader)
 
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", ams.stag_gcp.detect_stag_markers)
         Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
