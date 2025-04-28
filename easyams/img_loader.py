@@ -310,33 +310,39 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         
         <h3>Folder Structure:</h3>
         <p><b>Without camera groups:</b><br>
-        Root/<br>
-        ├── Chunk1/ (becomes chunk)<br>
-        │   ├── image1.jpg<br>
-        │   └── image2.jpg<br>
-        └── Chunk2/<br>
-            ├── image1.jpg<br>
-            └── image2.jpg</p>
+<pre>
+Root/
+├── Chunk1/ (becomes chunk)
+│   ├── image1.jpg
+│   └── image2.jpg
+└── Chunk2/
+    ├── image1.jpg
+    └── image2.jpg
+</pre>
+        </p>
         
         <p><b>With camera groups:</b><br>
-        Root/<br>
-        ├── Chunk1/ (becomes chunk)<br>
-        │   ├── Group1/ (becomes camera group)<br>
-        │   │   ├── image1.jpg<br>
-        │   │   └── image2.jpg<br>
-        │   └── Group2/<br>
-        │       ├── image1.jpg<br>
-        │       └── image2.jpg<br>
-        └── Chunk2/<br>
-            ├── Group1/<br>
-            │   ├── image1.jpg<br>
-            │   └── image2.jpg<br>
-            └── Group2/<br>
-                ├── image1.jpg<br>
-                └── image2.jpg</p>
+<pre>
+Root/
+├── Chunk1/ (becomes chunk)
+│   ├── Group1/ (becomes camera group)
+│   │   ├── image1.jpg
+│   │   └── image2.jpg
+│   └── Group2/
+│       ├── image1.jpg
+│       └── image2.jpg
+└── Chunk2/
+    ├── Group1/
+    │   ├── image1.jpg
+    │   └── image2.jpg
+    └── Group2/
+        ├── image1.jpg
+        └── image2.jpg
+</pre>
+        </p>
         
         <h3>Multi-camera Systems:</h3>
-        <p>Folders that contain subfolders with equal numbers of images will be detected as potential multi-camera systems <sup>2</sup>. 
+        <p>Folders that contain subfolders with equal numbers of images will be detected as potential multi-camera systems. 
         You'll be prompted to confirm whether to import them as such.</p>
         """)
         help_text.setWordWrap(True)
