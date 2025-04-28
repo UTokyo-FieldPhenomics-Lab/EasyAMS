@@ -221,7 +221,7 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                 chunk_path = os.path.join(self.root_path, chunk['name'])
                 if chunk_path in self.ignored_folders:
                     continue
-                    
+            
                 # Create new chunk
                 ms_chunk = doc.addChunk()
                 ms_chunk.label = chunk['name']
@@ -242,19 +242,17 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                             
                             # Add images to group <sup>1</sup>
                             image_paths = [os.path.join(group['path'], img) for img in group['images']]
-                            ms_chunk.addPhotos(image_paths)
-                            
-                            # Assign cameras to group <sup>3</sup>
-                            for camera in ms_chunk.cameras[-len(group['images']):]:
-                                camera.group = camera_group
+                            ms_chunk.addPhotos(image_paths, group=camera_group.key) 
+
                 else:
                     # Add images directly to chunk
                     images = chunk.get('images', [])
                     if images:
                         image_paths = [os.path.join(chunk['path'], img) for img in images]
                         ms_chunk.addPhotos(image_paths)
-            
+
             QMessageBox.information(self, "Success", "Images imported successfully!")
+
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error during import: {str(e)}")
 
@@ -342,8 +340,7 @@ Root/
         </p>
         
         <h3>Multi-camera Systems:</h3>
-        <p>Folders that contain subfolders with equal numbers of images will be detected as potential multi-camera systems. 
-        You'll be prompted to confirm whether to import them as such.</p>
+        <p>Importing multi-camera systems have not been supported yet. This plugin is currently designed for RGB cameras only.</p>
         """)
         help_text.setWordWrap(True)
         help_text.setTextFormat(Qt.RichText)

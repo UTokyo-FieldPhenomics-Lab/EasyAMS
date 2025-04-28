@@ -72,7 +72,8 @@ class ProgressDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Detecting Stag Markers")
-        self.resize(400, 150)
+        self.resize(500, 120)
+        self.setModal(True)  # 设置为模态对话框
 
         # 总进度条
         self.total_progress_label = QtWidgets.QLabel("Total Progress:")
@@ -84,12 +85,17 @@ class ProgressDialog(QtWidgets.QDialog):
         self.sub_progress_bar = QtWidgets.QProgressBar()
         self.sub_progress_bar.setRange(0, 100)
 
+        # 取消按钮
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.reject)
+
         # 布局
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.total_progress_label)
         layout.addWidget(self.total_progress_bar)
         layout.addWidget(self.sub_progress_label)
         layout.addWidget(self.sub_progress_bar)
+        layout.addWidget(self.cancel_btn)
         self.setLayout(layout)
 
     def update_total_progress(self, value):
