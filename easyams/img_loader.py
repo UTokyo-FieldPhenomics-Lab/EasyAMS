@@ -1,11 +1,12 @@
 import os
+import json
 from PySide2.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
                               QTreeWidget, QTreeWidgetItem, QFileDialog,
                               QCheckBox, QLabel, QMessageBox, QDialog, QScrollArea)
 from PySide2.QtCore import Qt
 import Metashape
 
-from .utils import mprint
+from .utils import PathManager
 
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
@@ -60,16 +61,21 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         # Variables
         self.root_path = ""
         self.img_ext = ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
+
+        self.path_manager = PathManager()
     
     def select_folder(self):
-        mprint('select_folder')
-        folder = QFileDialog.getExistingDirectory(self, "Select Root Image Folder")
-        mprint(folder)
+        last_path = self.path_manager.load_last_batch_import_path()
+        folder = QFileDialog.getExistingDirectory(self, "Select Root Image Folder", dir=last_path)
+
         if folder:
+            self.path_manager.save_last_batch_import_path(folder)
+
             self.root_path = folder
             self.folder_path.setText(folder)
             self.update_preview()
             self.import_btn.setEnabled(True)
+
 
     def get_folder_structure(self, root_path, use_camera_groups):
         """Shared function to scan folder structure and return organized data"""
@@ -217,8 +223,8 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                     continue
                     
                 # Create new chunk
-                chunk = doc.addChunk()
-                chunk.label = chunk['name']
+                ms_chunk = doc.addChunk()
+                ms_chunk.label = chunk['name']
                 
                 if use_camera_groups and chunk['groups']:
                     # Add camera groups
@@ -231,22 +237,22 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
 
                         if group['images']:
                             # Create camera group
-                            camera_group = chunk.addCameraGroup()
+                            camera_group = ms_chunk.addCameraGroup()
                             camera_group.label = group['name']
                             
                             # Add images to group <sup>1</sup>
                             image_paths = [os.path.join(group['path'], img) for img in group['images']]
-                            chunk.addPhotos(image_paths)
+                            ms_chunk.addPhotos(image_paths)
                             
                             # Assign cameras to group <sup>3</sup>
-                            for camera in chunk.cameras[-len(group['images']):]:
+                            for camera in ms_chunk.cameras[-len(group['images']):]:
                                 camera.group = camera_group
                 else:
                     # Add images directly to chunk
                     images = chunk.get('images', [])
                     if images:
                         image_paths = [os.path.join(chunk['path'], img) for img in images]
-                        chunk.addPhotos(image_paths)
+                        ms_chunk.addPhotos(image_paths)
             
             QMessageBox.information(self, "Success", "Images imported successfully!")
         except Exception as e:

@@ -20,10 +20,12 @@ def show_about_dialog():
     icon_label.setPixmap(QtGui.QPixmap(r"C:\OneDrive\Documents\4_PhD\10_PPT\template\UTokyoLab.resource\Picture1.png").scaled(128, 128, QtCore.Qt.KeepAspectRatio))  # 替换为你的 logo 路径
     top_layout.addWidget(icon_label)
 
+    from . import __version__
+
     title_layout = QtWidgets.QVBoxLayout()
     title_label = QtWidgets.QLabel("Easy Agisoft MetaShape Plugin")
     title_label.setFont(QtGui.QFont("Arial", 14, QtGui.QFont.Bold))
-    version_label = QtWidgets.QLabel("Version 0.0.1")
+    version_label = QtWidgets.QLabel(f"Version {__version__}")
     description_label = QtWidgets.QLabel("Extend Agisoft MetaShape for smart agriculture.")
 
     title_layout.addWidget(title_label)
