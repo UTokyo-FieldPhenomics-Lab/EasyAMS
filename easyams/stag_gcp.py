@@ -29,7 +29,7 @@ def detect_stag_markers():
     # :process selected images only: bool
     # :ignore masked image regions: bool
     params = {
-        "code_bit": 11,
+        "code_bit": 19,
         "onnx_model_path": system_info.onnx_file,
         "threshold": 0.7,
         "max_residual": 500,
@@ -70,8 +70,33 @@ class DetectMarkersThread:
 
             # 处理每个相机
             self.process_camera(camera, yolo)
+            
+            # self.process_camera_stag_native(camera, self.params['code_bit'])
 
         # back results to chunks
+
+    def process_camera_stag_native_api(self, camera, code_bit):
+        # read cv2 to memory
+        img_array = cv2.imread(camera.photo.path)
+
+        (corners, ids, rejected_corners) = stag.detectMarkers(img_array, code_bit)
+
+        if len(ids) == 1:  # only accept one marker detection results
+            marker_corner = np.squeeze(corners[0], axis=0)
+
+            # calculate center
+            marker_center = np.sum(marker_corner, axis=0) / 4
+
+            marker_id = ids[0][0]
+
+            if marker_id is not None:
+                # marker_center = marker_center_in_bbox + bbox_offset
+                mprint(f"[EasyAMS] detected Stag HD{self.params['code_bit']}-{marker_id} at ({marker_center[0]}, {marker_center[1]})")
+
+                marker_label = f"StagHD{self.params['code_bit']}-{marker_id}"
+
+                self.place_marker_on_photo(self.chunk, camera, marker_label, marker_center)
+
 
     def process_camera(self, camera, yolo):
         self.progress_dialog.update_sub_progress(0)
