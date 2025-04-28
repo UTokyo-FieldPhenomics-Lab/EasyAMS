@@ -1,9 +1,11 @@
 import os
 from PySide2.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-                              QTreeWidget, QTreeWidgetItem, QFileDialog, 
+                              QTreeWidget, QTreeWidgetItem, QFileDialog,
                               QCheckBox, QLabel, QMessageBox, QDialog, QScrollArea)
 from PySide2.QtCore import Qt
 import Metashape
+
+from .utils import mprint
 
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
@@ -57,129 +59,194 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         
         # Variables
         self.root_path = ""
-        self.multi_camera_dirs = []
+        self.img_ext = ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
     
     def select_folder(self):
+        mprint('select_folder')
         folder = QFileDialog.getExistingDirectory(self, "Select Root Image Folder")
+        mprint(folder)
         if folder:
             self.root_path = folder
             self.folder_path.setText(folder)
-            self.scan_folder_structure()
             self.update_preview()
             self.import_btn.setEnabled(True)
-    
-    def scan_folder_structure(self):
-        """Scan for potential multi-camera directories"""
-        self.multi_camera_dirs = []
-        
-        for root, dirs, files in os.walk(self.root_path):
-            # Check if this might be a multi-camera setup
-            if all(os.path.isdir(os.path.join(root, d)) for d in dirs):
-                image_counts = []
-                for d in dirs:
-                    subdir = os.path.join(root, d)
-                    image_count = len([f for f in os.listdir(subdir) 
-                                     if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff'))])
-                    image_counts.append(image_count)
-                
-                # If all subdirs have same number of images, might be multi-camera
-                if len(set(image_counts)) == 1 and len(dirs) > 1:
-                    self.multi_camera_dirs.append(root)
+
+    def get_folder_structure(self, root_path, use_camera_groups):
+        """Shared function to scan folder structure and return organized data"""
+        structure = {
+            'chunks': [],
+        }
+
+        # Build regular structure
+        for item in os.listdir(root_path):
+            item_path = os.path.join(root_path, item)
+            if os.path.isdir(item_path):
+                chunk_data = {
+                    'name': item,
+                    'path': item_path,
+                    'groups': []
+                }
+                if use_camera_groups:
+                    for sub_item in os.listdir(item_path):
+                        sub_item_path = os.path.join(item_path, sub_item)
+                        if os.path.isdir(sub_item_path):
+                            group_data = {
+                                'name': sub_item,
+                                'path': sub_item_path,
+                                'images': [f for f in os.listdir(sub_item_path) 
+                                        if f.lower().endswith(self.img_ext)]
+                            }
+                            chunk_data['groups'].append(group_data)
+                else:
+                    chunk_data['images'] = [f for f in os.listdir(item_path) 
+                                        if f.lower().endswith(self.img_ext)]
+                structure['chunks'].append(chunk_data)
+
+        return structure
     
 
     def update_preview(self):
-        """Update the tree widget preview"""
+        """Update the tree widget preview with checkboxes for folder selection"""
+
         if not self.root_path:
             return
             
         self.tree_widget.clear()
-        
         use_camera_groups = self.camera_group_cb.isChecked()
+        structure = self.get_folder_structure(self.root_path, use_camera_groups)
+
+        self.ignored_folders = set()  # 存储用户选择忽略的文件夹
         
         try:
-            for item in os.listdir(self.root_path):
-                item_path = os.path.join(self.root_path, item)
-                if os.path.isdir(item_path):
-                    # Add chunk item
-                    chunk_item = QTreeWidgetItem(self.tree_widget)
-                    chunk_item.setText(0, f"📁 {item} (Chunk)")
-                    
-                    if use_camera_groups:
-                        # Add camera groups
-                        for sub_item in os.listdir(item_path):
-                            sub_item_path = os.path.join(item_path, sub_item)
-                            if os.path.isdir(sub_item_path):
-                                group_item = QTreeWidgetItem(chunk_item)
-                                group_item.setText(0, f"📷 {sub_item} (Camera Group)")
-                                
-                                # Add sample images
-                                images = [f for f in os.listdir(sub_item_path) 
-                                         if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff'))]
-                                for img in images[:3]:  # Show first 3 as sample
-                                    img_item = QTreeWidgetItem(group_item)
-                                    img_item.setText(0, f"🖼 {img}")
-                                if len(images) > 3:
-                                    more_item = QTreeWidgetItem(group_item)
-                                    more_item.setText(0, f"... and {len(images)-3} more")
-                    else:
-                        # Add images directly under chunk
-                        images = [f for f in os.listdir(item_path) 
-                                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff'))]
-                        for img in images[:5]:  # Show first 5 as sample
-                            img_item = QTreeWidgetItem(chunk_item)
-                            img_item.setText(0, f"🖼 {img}")
-                        if len(images) > 5:
-                            more_item = QTreeWidgetItem(chunk_item)
-                            more_item.setText(0, f"... and {len(images)-5} more")
+            for chunk in structure['chunks']:
+                # 检查chunk是否有效（包含图片或有效group）
+                is_valid_chunk = bool(chunk['images']) if not use_camera_groups else any(group['images'] for group in chunk['groups'])
             
+                # Add chunk item with checkbox
+                chunk_item = QTreeWidgetItem(self.tree_widget)
+
+                chunk_suffix = "Chunk" if is_valid_chunk else "invalid chunk without images"
+
+                chunk_item.setText(0, f"📁 {chunk['name']} ({chunk_suffix})")
+                chunk_item.setCheckState(0, Qt.Checked if is_valid_chunk else Qt.Unchecked)
+                chunk_item.setData(0, Qt.UserRole, chunk['path'])  # 存储完整路径
+
+                if not is_valid_chunk:
+                    chunk_item.setFlags(chunk_item.flags() & ~Qt.ItemIsEnabled)  # 禁用无效chunk
+                    continue
+                    
+                if use_camera_groups:
+                    # Add camera groups with checkboxes
+                    for group in chunk['groups']:
+                        is_valid_group = bool(group['images'])
+
+                        group_item = QTreeWidgetItem(chunk_item)
+                        group_suffix = "Camera Group" if is_valid_group else "invalid camera group without images"
+
+                        group_item.setText(0, f"📷 {group['name']} ({group_suffix})")
+                        group_item.setCheckState(0, Qt.Checked if is_valid_group else Qt.Unchecked)
+                        group_item.setData(0, Qt.UserRole, group['path'])
+
+                        if not is_valid_group:
+                            group_item.setFlags(group_item.flags() & ~Qt.ItemIsEnabled)  # 禁用无效group
+                            continue
+                            
+                        # Add sample images (no checkboxes for images)
+                        for img in group['images'][:3]:  # Show first 3 as sample
+                            img_item = QTreeWidgetItem(group_item)
+                            img_item.setText(0, f"🖼 {img}")
+                        if len(group['images']) > 3:
+                            more_item = QTreeWidgetItem(group_item)
+                            more_item.setText(0, f"... and {len(group['images'])-3} more")
+                else:
+                    # Add images directly under chunk (no checkboxes for images)
+                    images = chunk.get('images', [])
+                    for img in images[:5]:
+                        img_item = QTreeWidgetItem(chunk_item)
+                        img_item.setText(0, f"🖼 {img}")
+                    if len(images) > 5:
+                        more_item = QTreeWidgetItem(chunk_item)
+                        more_item.setText(0, f"... and {len(images)-5} more")
+            
+            # 连接itemChanged信号以跟踪复选框状态变化<sup>1</sup>
+            self.tree_widget.itemChanged.connect(self.on_item_changed)
             self.tree_widget.expandAll()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error scanning folder: {str(e)}")
+
+    def on_item_changed(self, item, column):
+        """Handle checkbox state changes"""
+        state = item.checkState(0)
+
+        # 同步子项状态
+        if item.parent() is None:  # 如果是chunk顶级项
+            for i in range(item.childCount()):
+                child = item.child(i)
+                child.setCheckState(0, state)
+
+                if state == Qt.Unchecked:
+                    self.ignored_folders.add(child.data(0, Qt.UserRole))
+                else:
+                    self.ignored_folders.discard(child.data(0, Qt.UserRole))
+
+        if state == Qt.Unchecked:
+            self.ignored_folders.add(item.data(0, Qt.UserRole))  # 添加到忽略列表<sup>1</sup>
+        else:
+            self.ignored_folders.discard(item.data(0, Qt.UserRole))  # 从忽略列表移除<sup>1</sup>
+
+    def get_ignored_folders(self):
+        """Return the list of folders marked for ignoring"""
+        return list(self.ignored_folders)
+
     
     def import_images(self):
         """Perform the actual import"""
         if not self.root_path:
             return
+        
+        doc = Metashape.app.document
             
         use_camera_groups = self.camera_group_cb.isChecked()
-        doc = Metashape.app.document
+        structure = self.get_folder_structure(self.root_path, use_camera_groups)
         
         try:
-            for item in os.listdir(self.root_path):
-                item_path = os.path.join(self.root_path, item)
-                if os.path.isdir(item_path):
-                    # Check if this is a multi-camera directory
-                    if item_path in self.multi_camera_dirs:
-                        self.import_multi_camera(item_path, item)
-                        continue
+            for chunk in structure['chunks']:
+                # 跳过未选中的chunk
+                chunk_path = os.path.join(self.root_path, chunk['name'])
+                if chunk_path in self.ignored_folders:
+                    continue
                     
-                    # Create new chunk
-                    chunk = doc.addChunk()
-                    chunk.label = item
-                    
-                    if use_camera_groups:
-                        # Add camera groups
-                        for sub_item in os.listdir(item_path):
-                            sub_item_path = os.path.join(item_path, sub_item)
-                            if os.path.isdir(sub_item_path):
-                                # Create camera group
-                                camera_group = chunk.addCameraGroup()
-                                camera_group.label = sub_item
-                                
-                                # Add images to group
-                                images = [os.path.join(sub_item_path, f) for f in os.listdir(sub_item_path) 
-                                         if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff'))]
-                                if images:
-                                    chunk.addPhotos(images)
-                                    # Assign cameras to group
-                                    for camera in chunk.cameras[-len(images):]:
-                                        camera.group = camera_group
-                    else:
-                        # Add images directly to chunk
-                        images = [os.path.join(item_path, f) for f in os.listdir(item_path) 
-                                 if f.lower().endswith(('.jpg', '.jpeg', '.png', '.tif', '.tiff'))]
-                        if images:
-                            chunk.addPhotos(images)
+                # Create new chunk
+                chunk = doc.addChunk()
+                chunk.label = chunk['name']
+                
+                if use_camera_groups and chunk['groups']:
+                    # Add camera groups
+                    for group in chunk['groups']:
+
+                        # 跳过未选中的group
+                        group_path = os.path.join(chunk_path, group['name'])
+                        if group_path in self.ignored_folders:
+                            continue
+
+                        if group['images']:
+                            # Create camera group
+                            camera_group = chunk.addCameraGroup()
+                            camera_group.label = group['name']
+                            
+                            # Add images to group <sup>1</sup>
+                            image_paths = [os.path.join(group['path'], img) for img in group['images']]
+                            chunk.addPhotos(image_paths)
+                            
+                            # Assign cameras to group <sup>3</sup>
+                            for camera in chunk.cameras[-len(group['images']):]:
+                                camera.group = camera_group
+                else:
+                    # Add images directly to chunk
+                    images = chunk.get('images', [])
+                    if images:
+                        image_paths = [os.path.join(chunk['path'], img) for img in images]
+                        chunk.addPhotos(image_paths)
             
             QMessageBox.information(self, "Success", "Images imported successfully!")
         except Exception as e:
