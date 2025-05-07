@@ -77,7 +77,7 @@ class DetectMarkersThread:
 
     def process_camera_stag_native_api(self, camera, code_bit):
         # read cv2 to memory
-        img_array = cv2.imread(camera.photo.path)
+        img_array = cv2.imread(camera.photo.path, cv2.IMREAD_COLOR|cv2.IMREAD_IGNORE_ORIENTATION)
 
         (corners, ids, rejected_corners) = stag.detectMarkers(img_array, code_bit)
 
@@ -100,10 +100,12 @@ class DetectMarkersThread:
 
     def process_camera(self, camera, yolo):
         self.progress_dialog.update_sub_progress(0)
+        mprint(f"[EasyAMS] processing image [{camera.label}] ")
 
         # read cv2 to memory
-        img_array = cv2.imread(camera.photo.path)
+        img_array = cv2.imread(camera.photo.path, cv2.IMREAD_COLOR|cv2.IMREAD_IGNORE_ORIENTATION)
         self.progress_dialog.update_sub_progress(10)
+        mprint(f"    |--- image read with size [{img_array.shape}] ")
 
         # actual detection process
         detections = yolo.get_detection(img_array)
@@ -112,9 +114,9 @@ class DetectMarkersThread:
         # remove too large detections
         filtered_detections = yolo.filter_results(detections, self.params['max_residual'])
         filtered_detection_num = len(filtered_detections)
-        mprint(f"[EasyAMS] filtered out {filtered_detection_num} of total {len(detections)} detections mets maximum residual {self.params['max_residual']} pixels")
+        mprint(f"    |--- filtered out {filtered_detection_num} of total {len(detections)} detections mets maximum residual {self.params['max_residual']} pixels")
         for detection in filtered_detections:
-            mprint(f"{detection.bbox.to_xyxy()}, Confidence: {detection.score.value}")
+            mprint(f"    |    |--- {detection.bbox.to_xyxy()}, Confidence: {detection.score.value}")
         self.progress_dialog.update_sub_progress(60)
 
         # using stag-python to detect markers
@@ -132,7 +134,7 @@ class DetectMarkersThread:
 
             if marker_id is not None:
                 marker_center = marker_center_in_bbox + bbox_offset
-                mprint(f"[EasyAMS] detected Stag HD{self.params['code_bit']}-{marker_id} at ({marker_center[0]}, {marker_center[1]})")
+                mprint(f"    |--- detected Stag HD{self.params['code_bit']}-{marker_id} at ({marker_center[0]}, {marker_center[1]})")
 
                 marker_label = f"StagHD{self.params['code_bit']}-{marker_id}"
 
@@ -158,13 +160,13 @@ class DetectMarkersThread:
         if existing_marker:
             # Update the existing marker's projection
             existing_marker.projections[camera] = Metashape.Marker.Projection(marker_center, True)
-            print(f"Updated marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
+            print(f"    |--- Updated marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
         else:
             # Create a new marker
             marker = chunk.addMarker()
             marker.label = marker_label
             marker.projections[camera] = Metashape.Marker.Projection(marker_center, True)
-            print(f"Added new marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
+            print(f"    |--- Added new marker '{marker_label}' on camera '{camera.label}' at {marker_center}.")
 
 
 class StagYoloDetector:
@@ -184,8 +186,8 @@ class StagYoloDetector:
         result = get_sliced_prediction(
             img_array,
             self.detection_model,
-            slice_height=512,
-            slice_width=512,
+            slice_height=1024,
+            slice_width=1024,
             overlap_height_ratio=0.2,
             overlap_width_ratio=0.2,
         )
