@@ -46,6 +46,46 @@ def detect_stag_markers():
     # thread.start()
     thread.run()
 
+def detect_all_stag_markers():
+    doc = Metashape.app.document
+    chunks = doc.chunks
+
+    from . import system_info
+    # 检查 onnx 文件是否存在
+    if system_info is None or not os.path.exists(system_info.onnx_file):
+        raise FileNotFoundError("[EasyAMS] could not find onnx file")
+    
+    # here need to popup a ui with following choices
+    # :target type: stag HD17, stag HD19, etc
+    # :Tolerance: 0-1, # confidence threshold of model
+    # :maximum residual (pixel): 500 (by default, not execeed 1000 for stag-python detection)
+    # :process selected images only: bool
+    # :ignore masked image regions: bool
+    params = {
+        "code_bit": 19,
+        "onnx_model_path": system_info.onnx_file,
+        "threshold": 0.7,
+        "max_residual": 500,
+        "only_selected_img": False,
+        "ignore_mask": False
+    }
+
+
+    for chunk in chunks:
+        if not chunk.enabled:
+            pass
+
+        mprint(f"[EasyAMS] Processing chunk [{chunk.label}]")
+
+        # 创建进度对话框
+        progress_dialog = ProgressDialog()
+        progress_dialog.show()
+
+        # 创建并启动线程
+        thread = DetectMarkersThread(chunk, params, progress_dialog)
+        # thread.start()
+        thread.run()
+
 # class DetectMarkersThread(QtCore.QThread):
 class DetectMarkersThread:
     def __init__(self, chunk, params, progress_dialog):
