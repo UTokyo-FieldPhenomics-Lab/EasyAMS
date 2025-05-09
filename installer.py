@@ -707,14 +707,8 @@ if __name__ == "__main__":
         
         import easyams as ams
 
-        Metashape.app.addMenuItem("EasyAMS/batchImport/Import Images", ams.img_loader.create_batch_image_loader)
+        ams.ui.add_metashape_menu()
 
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", ams.stag_gcp.detect_stag_markers)
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers in all chunks", ams.stag_gcp.detect_all_stag_markers)
-        Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
-        Metashape.app.addMenuSeparator("EasyAMS")
-        Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
-        Metashape.app.addMenuItem("EasyAMS/About EasyAMS", ams.ui.show_about_dialog)
     else:
         installer.main()
         installer.print_paths()

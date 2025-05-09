@@ -258,7 +258,7 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
 
     
     def import_multi_camera(self, path, chunk_name):
-        """Handle multi-camera system import <sup>2</sup>"""
+        """Handle multi-camera system import (not implemented)"""
         doc = Metashape.app.document
         chunk = doc.addChunk()
         chunk.label = chunk_name

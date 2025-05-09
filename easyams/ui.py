@@ -1,6 +1,24 @@
 from PySide2 import QtWidgets, QtGui, QtCore
 import Metashape
 
+from . import img_loader, stag_gcp
+
+def add_metashape_menu():
+    # img loader function
+    Metashape.app.addMenuItem("EasyAMS/batchImport/Import Images", img_loader.create_batch_image_loader)
+
+    # stag_gcp function
+    Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", stag_gcp.detect_stag_markers)
+    Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers in all chunks", stag_gcp.detect_all_stag_markers)
+    # Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
+
+    # -----------------------
+    Metashape.app.addMenuSeparator("EasyAMS")
+
+    # about easyams
+    # Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
+    Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
+
 def show_about_dialog():
     
     # 创建主对话框
