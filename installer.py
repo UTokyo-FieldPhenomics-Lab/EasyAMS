@@ -6,33 +6,13 @@ import shutil
 import hashlib
 import subprocess
 
-from packaging import version
+# uv installer dependencies
+import tempfile
+import tarfile
+import zipfile
+from typing import Dict, Optional
 
 import Metashape
-
-REQUIREMENTS_INFERENCE = """
-# opencv numpy requirements
-numpy==1.26.4
-
-# stag
-stag-python==1.1.0
-opencv-python==4.10.0.84
-
-# inference
-onnx==1.17.0
-onnxruntime==1.19.2
-
-# modified sahi package for inferencing, thus no need ultralytics, torch framework for inferencing
-# sahi==0.11.20
-# ultralytics==8.3.77
-# torch==2.5.1
-# torchvision==0.20.1
-shapely>=2.0.0
-tqdm>=4.48.2
-pillow>=8.2.0
-pybboxes==0.1.6
-requests==2.32.3
-"""
 
 def mprint(*values, **kwargs):
     print(*values, **kwargs)
@@ -42,6 +22,38 @@ def path_equal(path1, path2):
     abs_path1 = os.path.abspath(os.path.normpath(path1))
     abs_path2 = os.path.abspath(os.path.normpath(path2))
     return abs_path1 == abs_path2
+
+def execude_command(cmd):
+    mprint(f"[EasyAMS][CMD] {' '.join(cmd)}")
+
+    try:
+        # 使用 Popen 执行命令
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+
+        # 实时读取标准输出
+        for line in process.stdout:
+            mprint(">>> ", line.strip())  # 打印每一行输出
+
+        # 等待命令执行完成
+        process.wait()
+
+        # 检查是否有标准错误输出
+        if process.returncode != 0:
+            mprint("[EasyAMS][Error]:")
+            for line in process.stderr:
+                mprint("   ", line.strip())
+                Metashape.app.update()
+
+            return False
+        else:
+            return True
+
+    except Exception as e:
+        mprint(f"[EasyAMS][Error] when executing the following command:\n"
+                f"    {cmd}\n"
+                f"    {e}")
+        return False
+
 
 class Installer:
 
@@ -70,12 +82,10 @@ class Installer:
 
         self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
 
+        self.easyams_bin_folder = os.path.join(self.easyams_plugin_folder, "bin")
+
         # install status checker
         self.venv_is_ready = False
-
-        self.required_packages = self.parse_requirements(REQUIREMENTS_INFERENCE)
-        self.installed_packages = {}   # {'package': version, ...}
-        self.not_installed_packages = []  # 'package==version' for pip command
         self.package_is_ready = False
 
         # git downloader
@@ -112,123 +122,68 @@ class Installer:
         mprint(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
         mprint(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
 
-    def execude_command(self, cmd):
-        mprint(f"[EasyAMS][CMD] {' '.join(cmd)}")
-
-        try:
-            # 使用 Popen 执行命令
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
-
-            # 实时读取标准输出
-            for line in process.stdout:
-                mprint(">>> ", line.strip())  # 打印每一行输出
-
-            # 等待命令执行完成
-            process.wait()
-
-            # 检查是否有标准错误输出
-            if process.returncode != 0:
-                mprint("[EasyAMS][Error]:")
-                for line in process.stderr:
-                    mprint("   ", line.strip())
-                    Metashape.app.update()
-
-                return False
-            else:
-                return True
-
-        except Exception as e:
-            mprint(f"[EasyAMS][Error] when executing the following command:\n"
-                    f"    {cmd}\n"
-                    f"    {e}")
-            return False
         
-    @staticmethod
-    def uv_installed_in_ms_python():
-        import pkg_resources
-        try:
-            # Parse the dependency (e.g., "numpy==1.26.4" or "shapely>=2.0.0")
-            # Check if the installed version satisfies the requirement
-            pkg_resources.require('uv')
-            print(f"[EasyAMS] uv is installed in Metashape buildin python.")
-            return True
-        except pkg_resources.DistributionNotFound:
-            print(f"[EasyAMS] uv is not installed in Metashape buildin python.")
-            return False
+    def get_uv_execute_path(self) -> str:
+        """
+        Returns
+        -------
+        str
+            The commend to execute uv
+        """
+
+        # test if uv is globally installed on the system
+        if shutil.which("uv") is not None:
+            mprint(f"[EasyAMS] uv is detected on this PC")
+
+            return "uv"
+        else:
+            # use 3rd party uv just for easyams package
+            self.plugin_uv_path = os.path.join(self.easyams_bin_folder)
+            mprint(self.plugin_uv_path)
+
+            # install uv bin to package folder
+            try:
+                installer = UvInstaller(install_dir=self.easyams_bin_folder)
+                success = installer.install()
+                if success:
+                    mprint("Installation successful")
+                else:
+                    mprint("Installation failed", file=sys.stderr)
+            except Exception as e:
+                mprint(f"Installation failed: {e}", file=sys.stderr)
 
     def create_venv(self):
         mprint("[EasyAMS][Func] Creating virtual environment...")
 
-        if self.system != "Windows":
-            # not windows, just using `python -m venv <venv_folder>` to create venv
-            install_uv_cmd = [
-                self.metashape_python_executable_path,
-                "-m",
-                "venv",
-                self.easyams_venv_folder
-            ]
-
-            # remove existing venv folder
-            if os.path.exists(self.easyams_venv_folder):
-                shutil.rmtree(self.easyams_venv_folder)
-
-
-            is_okay = self.execude_command(install_uv_cmd)
-            if is_okay:
-                mprint("[EasyAMS] virtual isolated python venv created")
-            else:
-                mprint("[EasyAMS] virtual isolated python venv creation failed")
-            return is_okay
+        # create venv using uv
+        install_same_py_cmd = [
+            "uv", 
+            "python",
+            "install",
+            self.metashape_python_version
+        ]
+        is_okay = execude_command(install_same_py_cmd)
+        if is_okay:
+            mprint("[EasyAMS] python with same version as Metashape installed successfully.")
         else:
-            # windows metashape build in python has bugs on creating venv, so we use uv instead
-            if not self.uv_installed_in_ms_python():
+            mprint("[EasyAMS] Failed to install python same version as Metashape.")
 
-                install_uv_cmd = [
-                    self.metashape_python_executable_path,
-                    "-m",
-                    "pip",
-                    "install",
-                    "uv"
-                ]
+        # create venv using uv
+        create_venv_cmd = [
+            "uv"
+            "venv",
+            self.easyams_venv_folder.replace("\\", "/"),  # metashape path has spaces
+            "--python",
+            self.metashape_python_version
+        ]
+        is_okay = execude_command(create_venv_cmd)
 
-                is_okay = self.execude_command(install_uv_cmd)
-                if is_okay:
-                    mprint("[EasyAMS] UV venv manager installed successfully.")
-                else:
-                    mprint("[EasyAMS] Failed to install UV venv manager.")
-                    return False
+        if is_okay:
+            mprint("[EasyAMS] virtual isolated python venv created")
+        else:
+            mprint("[EasyAMS] virtual isolated python venv creation failed")
 
-            uv_executable_path = self.metashape_python_executable_path.replace("python.exe", "Scripts/uv.exe")
-            
-            # create venv using uv
-            install_same_py_cmd = [
-                uv_executable_path,
-                "python",
-                "install",
-                self.metashape_python_version
-            ]
-            is_okay = self.execude_command(install_same_py_cmd)
-            if is_okay:
-                mprint("[EasyAMS] python with same version as Metashape installed successfully.")
-            else:
-                mprint("[EasyAMS] Failed to install python same version as Metashape.")
-
-            # create venv using uv
-            create_venv_cmd = [
-                uv_executable_path,
-                "venv",
-                self.easyams_venv_folder.replace("\\", "/"),  # metashape path has spaces
-                "--python",
-                self.metashape_python_version
-            ]
-            is_okay = self.execude_command(create_venv_cmd)
-
-            if is_okay:
-                mprint("[EasyAMS] virtual isolated python venv created")
-            else:
-                mprint("[EasyAMS] virtual isolated python venv creation failed")
-
-            return is_okay
+        return is_okay
 
     def venv_ready(self):
         if not os.path.exists(self.easyams_venv_folder):
@@ -252,8 +207,6 @@ class Installer:
             else:
                 easyams_venv_python_executable_folder = os.path.join(self.easyams_venv_folder, "bin")
                 self.easyams_venv_python_executable_file = os.path.join(easyams_venv_python_executable_folder, "python")
-            
-            self.check_pip_available( easyams_venv_python_executable_folder )
 
             self.venv_is_ready = True
             return self.venv_is_ready
@@ -263,139 +216,6 @@ class Installer:
                 f"[EasyAMS] venv python version ({self.easyams_venv_python_version}) "
                 f"does not match with metashape python version {self.metashape_python_version}")
             return self.venv_is_ready
-        
-    def check_pip_available(self, pyexe_path):
-        mprint(f'[EasyAMS][Func] Checking pip availability...')
-
-        has_pip = False
-        for exe in os.listdir(pyexe_path):
-            if 'pip' in exe:
-                has_pip = True
-                break
-        
-        if not has_pip:
-            # install pip from curl
-            get_pip_py = os.path.join(self.easyams_plugin_folder, "get-pip.py")
-
-            if not os.path.exists(get_pip_py):
-                curl_cmd = [
-                    "curl",
-                    "--output", 
-                    get_pip_py,
-                    "https://bootstrap.pypa.io/get-pip.py"
-                ]
-
-                is_okay = self.execude_command(curl_cmd)
-                if is_okay and os.path.exists(get_pip_py):
-                    mprint(f'[EasyAMS][Func] get-pip.py downloaded successfully.')
-                else:
-                    mprint(f'[EasyAMS][Error] Failed to download get-pip.py')
-            
-            if os.path.exists(get_pip_py):
-                install_pip_cmd = [
-                    self.easyams_venv_python_executable_file,
-                    get_pip_py
-                ]
-                is_okay = self.execude_command(install_pip_cmd)
-                if is_okay:
-                    mprint(f'[EasyAMS][Func] pip installed successfully.')
-                else:
-                    mprint(f'[EasyAMS][Error] Failed to install pip')
-
-    # 提取非注释的依赖项
-    @staticmethod
-    def parse_requirements(requirements_str):
-        dependencies = []
-        for line in requirements_str.splitlines():
-            line = line.strip()
-            # 忽略空行和注释行
-            if line and not line.startswith("#"):
-                dependencies.append(line)
-        return dependencies
-    
-    def get_venv_installed_package_info(self):
-        """
-        Get a dictionary of installed packages and their versions in the specified virtual environment.
-
-        :param venv_python_path: The path to the Python executable in the virtual environment.
-        :return: A dictionary where keys are package names and values are their installed versions.
-        """
-        try:
-            # Use `pip list` to get all installed packages and their versions
-            result = subprocess.run(
-                [
-                    self.easyams_venv_python_executable_file, 
-                    "-m", "pip", "list", "--format=freeze"
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            if result.returncode != 0:
-                raise RuntimeError(f"[EasyAMS] Failed to get installed packages: {result.stderr}")
-
-            # Parse the output of `pip list`
-            self.installed_packages = {}
-            for line in result.stdout.splitlines():
-                if "==" in line:  # Only consider lines with "package==version"
-                    package, version = line.split("==")
-                    self.installed_packages[package.lower()] = version
-        except Exception as e:
-            mprint(f"[EasyAMS] Error while getting installed packages: {e}")
-            self.installed_packages = {}
-
-    # Check if a dependency is installed with the correct version
-    def check_one_package_in_venv(self, dependency):
-        """
-        Check if a dependency is installed and meets the required version.
-
-        :param dependency: The dependency string (e.g., "numpy==1.26.4" or "shapely>=2.0.0").
-        :param installed_packages: A dictionary of installed packages and their versions.
-        :return: True if the dependency is installed and meets the required version, False otherwise.
-        """
-
-        try:
-            # Parse the dependency (e.g., "numpy==1.26.4" or "shapely>=2.0.0")
-            # only == and >= are supported in EasyAMS requirements.txt
-            if "==" in dependency:
-                package, required_version = dependency.split("==")
-                package = package.lower()
-                if package in self.installed_packages.keys():
-                    installed_version = self.installed_packages[package]
-                    if version.parse(installed_version) == version.parse(required_version):
-                        mprint(f">>> {dependency} is installed and meets the required version.")
-                        return True
-                    else:
-                        mprint(f">>> {dependency} is installed, but the version is {installed_version} (required: {required_version}).")
-                        return False
-                else:
-                    mprint(f">>> {dependency} is not installed.")
-                    return False
-            elif ">=" in dependency:
-                package, required_version = dependency.split(">=")
-                package = package.lower()
-                if package in self.installed_packages:
-                    installed_version = self.installed_packages[package]
-                    if version.parse(installed_version) >= version.parse(required_version):
-                        mprint(f">>> {dependency} is installed and meets the required version.")
-                        return True
-                    else:
-                        mprint(f">>> {dependency} is installed, but the version is {installed_version} (required: >= {required_version}).")
-                        return False
-                else:
-                    mprint(f">>> {dependency} is not installed.")
-                    return False
-            else:
-                package = dependency.lower()
-                if package in self.installed_packages.keys():
-                    mprint(f">>> {dependency} is installed (no specific version requirement).")
-                    return True
-                else:
-                    mprint(f">>> {dependency} is not installed.")
-                    return False
-        except Exception as e:
-            mprint(f"[EasyAMS][func] Error checking dependency {dependency}: {e}")
-            return False
         
     def check_dependencies(self):
         self.get_venv_installed_package_info()
@@ -427,32 +247,12 @@ class Installer:
                 *self.not_installed_packages
             ]
 
-            is_okay = self.execude_command(cmd)
+            is_okay = execude_command(cmd)
             if is_okay:
                 mprint("[EasyAMS] Dependencies installed successfully.")
                 Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
             else:
                 mprint("[EasyAMS] Failed to install dependencies.")
-
-    def _install_easyams_dev(self):
-
-        if self.venv_is_ready or self.venv_ready():
-
-            cmd = [
-                self.easyams_venv_python_executable_file,
-                "-m",
-                "pip",
-                "install",
-                "-e",
-                self.easyams_installer_folder
-            ]
-
-            is_okay = self.execude_command(cmd)
-            if is_okay:
-                mprint("[EasyAMS] EasyAMS package installed successfully.")
-                Metashape.app.messageBox("EasyAMS successfully installed.")
-            else:
-                mprint("[EasyAMS] Failed to install EasyAMS package.")
 
     def add_venv_to_path(self):
         mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
@@ -491,7 +291,7 @@ class Installer:
                     f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
 
-    def check_onnx_version(self):
+    def check_onnx_file_version(self):
         # 检查是否需要更新
         is_outdated, local_version, github_version = self.gitdown.outdated(return_versions=True)
         if is_outdated:
@@ -509,6 +309,9 @@ class Installer:
 
     def main(self):
         mprint("[EasyAMS] Initializing the plugin...")
+
+        self.get_uv_execute_path()
+
         # create virtual envs
         if not self.venv_ready():
             self.create_venv()
@@ -524,8 +327,251 @@ class Installer:
 
             global requests
             import requests
-            self.check_onnx_version()
+            self.check_onnx_file_version()
 
+
+class UvInstaller:
+
+    """A class to handle downloading and installing uv binaries. Inspiared by 
+    https://github.com/CherryHQ/cherry-studio/blob/develop/resources/scripts/install-uv.js
+    """
+
+    # Base URL for downloading uv binaries
+    UV_RELEASE_BASE_URL = "http://gitcode.com/CherryHQ/uv/releases/download"
+    DEFAULT_UV_VERSION = "0.6.14"
+    # Mapping of platform+arch to binary package name
+    UV_PACKAGES = {
+        "darwin-arm64": "uv-aarch64-apple-darwin.tar.gz",
+        "darwin-x64": "uv-x86_64-apple-darwin.tar.gz",
+        "windows-arm64": "uv-aarch64-pc-windows-msvc.zip",
+        "windows-ia32": "uv-i686-pc-windows-msvc.zip",
+        "windows-x64": "uv-x86_64-pc-windows-msvc.zip",
+        "linux-arm64": "uv-aarch64-unknown-linux-gnu.tar.gz",
+        "linux-ia32": "uv-i686-unknown-linux-gnu.tar.gz",
+        "linux-ppc64": "uv-powerpc64-unknown-linux-gnu.tar.gz",
+        "linux-ppc64le": "uv-powerpc64le-unknown-linux-gnu.tar.gz",
+        "linux-s390x": "uv-s390x-unknown-linux-gnu.tar.gz",
+        "linux-x64": "uv-x86_64-unknown-linux-gnu.tar.gz",
+        "linux-armv7l": "uv-armv7-unknown-linux-gnueabihf.tar.gz",
+        # MUSL variants
+        "linux-musl-arm64": "uv-aarch64-unknown-linux-musl.tar.gz",
+        "linux-musl-ia32": "uv-i686-unknown-linux-musl.tar.gz",
+        "linux-musl-x64": "uv-x86_64-unknown-linux-musl.tar.gz",
+        "linux-musl-armv6l": "uv-arm-unknown-linux-musleabihf.tar.gz",
+        "linux-musl-armv7l": "uv-armv7-unknown-linux-musleabihf.tar.gz",
+    }
+
+    def __init__(self, version: str = DEFAULT_UV_VERSION, install_dir: Optional[str] = None):
+        """
+        Initialize the UvInstaller.
+        
+        Args:
+            version: Version of uv to install (default: DEFAULT_UV_VERSION)
+            install_dir: Directory to install uv (default: ~/.cherrystudio/bin)
+        """
+        self.version = version
+        self.install_dir = install_dir or os.path.join(os.path.expanduser("~"), ".cherrystudio", "bin")
+
+        self.arch = self.detect_arch()
+        self.is_musl = self.detect_is_musl()
+
+    @staticmethod
+    def detect_arch():
+        """Detects current platform and architecture."""
+        arch = os.uname().machine if hasattr(os, "uname") else os.environ.get("PROCESSOR_ARCHITECTURE", "")
+        
+        # Normalize some architecture names
+        if arch == "x86_64":
+            arch = "x64"
+        elif arch == "amd64":
+            arch = "x64"
+        elif arch == "i386":
+            arch = "ia32"
+        elif arch == "aarch64":
+            arch = "arm64"
+        
+        return arch
+    
+    @staticmethod
+    def detect_is_musl() -> bool:
+        """Attempts to detect if running on MUSL libc."""
+
+        if platform.system().lower() != 'linux':
+            return False
+        
+        try:
+            # Simple check for Alpine Linux which uses MUSL
+            if os.path.exists("/etc/os-release"):
+                with open("/etc/os-release", "r") as f:
+                    content = f.read().lower()
+                    return "alpine" in content
+        except Exception:
+            pass
+        
+        # Alternative check using ldd
+        try:
+            result = subprocess.run(["ldd", "--version"], capture_output=True, text=True)
+            return "musl" in result.stdout.lower()
+        except Exception:
+            pass
+        
+        return False
+
+    def download_file(self, url: str, dest_path: str) -> None:
+        """Download a file from URL to destination path with progress."""
+
+        def _download_with_curl(url: str, dest_path: str) -> None:
+            """使用 curl 下载（macOS/Linux 默认安装）"""
+            cmd = [
+                "curl", "-L", "--progress-bar",
+                "--output", dest_path,
+                "--fail",  # 确保HTTP错误时退出非0
+                url
+            ]
+            # subprocess.run(cmd, check=True)
+            execude_command(cmd)
+
+        def _download_with_wget(url: str, dest_path: str) -> None:
+            """使用 wget 下载（Linux 常见，Windows需手动安装）"""
+            cmd = [
+                "wget", "--show-progress", "--progress=bar:force",
+                "-O", dest_path,
+                "--no-check-certificate",  # 跳过SSL验证（兼容性）
+                url
+            ]
+            # subprocess.run(cmd, check=True)
+            execude_command(cmd)
+
+        def _download_with_builtin(url: str, dest_path: str) -> None:
+            """最终回退方案（Python内置库）"""
+
+            def report_hook(count: int, block_size: int, total_size: int) -> None:
+                percent = int(count * block_size * 100 / total_size)
+                mprint(f"\rDownloading... {percent}%", end="", flush=True)
+
+            try:
+                import urllib.request
+
+                urllib.request.urlretrieve(url, dest_path, reporthook=report_hook)
+
+            except Exception as e:
+                raise RuntimeError(f"Failed to download uv packages: {str(e)}")
+            
+        mprint(f"Downloading from {url} to {dest_path}")
+        # 尝试使用系统工具（按优先级顺序）
+        tools = ["curl", "wget"]
+        for tool in tools:
+            try:
+                if tool == "curl":
+                    _download_with_curl(url, dest_path)
+                elif tool == "wget":
+                    _download_with_wget(url, dest_path)
+                return
+            except (subprocess.SubprocessError, FileNotFoundError):
+                continue
+       
+        mprint("\nDownload completed")
+
+        _download_with_builtin(url, dest_path)
+
+
+    def install(self) -> bool:
+        """
+        Downloads and extracts the uv binary for the detected platform and architecture.
+        
+        Returns:
+            bool: True if installation succeeded, False otherwise
+        """
+        if self.is_musl:
+            platform_key = f"{platform.system().lower()}-musl-{self.arch}" 
+        else:
+            platform_key = f"{platform.system().lower()}-{self.arch}"
+
+        package_name = self.UV_PACKAGES.get(platform_key)
+        mprint(f"Installing uv {self.version} for {platform_key}")
+        
+        if not package_name:
+            mprint(f"No binary available for {platform_key}", file=sys.stderr)
+            return False
+        
+        # Create output directory structure
+        os.makedirs(self.install_dir, exist_ok=True)
+
+        # Download URL for the specific binary
+        download_url = f"{self.UV_RELEASE_BASE_URL}/{self.version}/{package_name}"
+        temp_dir = tempfile.gettempdir()
+        temp_filename = os.path.join(temp_dir, package_name)
+
+        try:
+            mprint(f"Downloading uv {self.version} for {platform_key}...")
+            mprint(f"URL: {download_url}")
+            self.download_file(download_url, temp_filename)
+            mprint(f"Extracting {package_name} to {self.install_dir}...")
+
+            #############################
+            # Windows zip file:
+            #   uv.zip
+            #   ├── uv    (可执行文件)
+            #   └── uvx   (可执行文件)
+            #
+            # Unix-link tar.gz file:
+            #   uv.tar.gz
+            #    uv-<platform>/
+            #    ├── uv    (可执行文件)
+            #    └── uvx   (可执行文件)
+            #############################
+            if package_name.endswith(".zip"):
+                # Handle zip files
+                with zipfile.ZipFile(temp_filename, "r") as zip_ref:
+                    zip_ref.extractall(self.install_dir)
+
+                os.unlink(temp_filename)
+                print(f"Successfully installed uv {self.version} for {platform_key}")
+                return True
+            else:
+                # Handle tar.gz files
+                with tarfile.open(temp_filename, "r:gz") as tar_ref:
+                    found_files = {m.name for m in tar_ref.getmembers() if m.isfile()}
+                    
+                    # Extract directly to install directory
+                    for member in tar_ref:
+                        if member.name in found_files:
+                            # Remove the platform directory prefix
+                            # uv-<platform>/
+                            member.name = os.path.basename(member.name)
+                            tar_ref.extract(member, self.install_dir)
+                            
+                            # Ensure executable permissions (non-Windows)
+                            if platform.system() != "Windows":
+                                dest_path = os.path.join(self.install_dir, member.name)
+                                try:
+                                    os.chmod(dest_path, 0o755)  # rwxr-xr-x
+                                except OSError as e:
+                                    print(f"Warning: Failed to set permissions for {member.name}: {e}", 
+                                        file=sys.stderr)
+                
+                os.unlink(temp_filename)
+                print(f"Successfully installed uv")
+                return True
+        
+        except Exception as e:
+            print(f"Error installing uv for {platform_key}: {e}", file=sys.stderr)
+            
+            if os.path.exists(temp_filename):
+                try:
+                    os.unlink(temp_filename)
+                except OSError:
+                    pass
+            # Check if install_dir is empty and remove it if so
+            try:
+                if os.path.exists(self.install_dir) and not os.listdir(self.install_dir):
+                    shutil.rmtree(self.install_dir)
+                    print(f"Removed empty directory: {self.install_dir}")
+            except OSError as cleanup_error:
+                print(f"Warning: Failed to clean up directory: {cleanup_error}", file=sys.stderr)
+            return False
+    
+    
 
 class GitReleaseDownloader:
 
