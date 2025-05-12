@@ -15,7 +15,8 @@ from typing import Dict, Optional
 import Metashape
 
 def mprint(*values, **kwargs):
-    print(*values, **kwargs)
+    prefixed_values = ["[EasyAMS]"] + list(values)
+    print(*prefixed_values, **kwargs)
     Metashape.app.update()
 
 def path_equal(path1, path2):
@@ -24,7 +25,7 @@ def path_equal(path1, path2):
     return abs_path1 == abs_path2
 
 def execude_command(cmd):
-    mprint(f"[EasyAMS][CMD] {' '.join(cmd)}")
+    mprint(f"[CMD] {' '.join(cmd)}")
 
     try:
         # 使用 Popen 执行命令
@@ -39,7 +40,7 @@ def execude_command(cmd):
 
         # 检查是否有标准错误输出
         if process.returncode != 0:
-            mprint("[EasyAMS][Error]:")
+            mprint("[Error]:")
             for line in process.stderr:
                 mprint("   ", line.strip())
                 Metashape.app.update()
@@ -49,9 +50,9 @@ def execude_command(cmd):
             return True
 
     except Exception as e:
-        mprint(f"[EasyAMS][Error] when executing the following command:\n"
-                f"    {cmd}\n"
-                f"    {e}")
+        mprint(f"[Error] when executing the following command:\n"
+               f"    {cmd}\n"
+               f"    {e}")
         return False
 
 
@@ -80,9 +81,10 @@ class Installer:
         if not os.path.exists(self.easyams_plugin_folder):
             os.makedirs(self.easyams_plugin_folder)
 
-        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
-
+        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, ".venv")
         self.easyams_bin_folder = os.path.join(self.easyams_plugin_folder, "bin")
+
+        self.easyams_uv = os.path.join(self.easyams_bin_folder, "uv.exe" if self.system == "Windows" else "uv")
 
         # install status checker
         self.venv_is_ready = False
@@ -123,7 +125,7 @@ class Installer:
         mprint(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
 
         
-    def get_uv_execute_path(self) -> str:
+    def is_uv_installed(self) -> str:
         """
         Returns
         -------
@@ -133,31 +135,28 @@ class Installer:
 
         # test if uv is globally installed on the system
         if shutil.which("uv") is not None:
-            mprint(f"[EasyAMS] uv is detected on this PC")
-
-            return "uv"
+            mprint(f"uv is detected on this PC")
+            self.easyams_uv = "uv"
+            return True
         else:
             # use 3rd party uv just for easyams package
-            self.plugin_uv_path = os.path.join(self.easyams_bin_folder)
-            mprint(self.plugin_uv_path)
-
-            # install uv bin to package folder
-            try:
+            if os.path.exists( self.easyams_uv ):
+                return True
+            else:
+                # install uv bin to package folder
                 installer = UvInstaller(install_dir=self.easyams_bin_folder)
                 success = installer.install()
                 if success:
-                    mprint("Installation successful")
+                    return True
                 else:
-                    mprint("Installation failed", file=sys.stderr)
-            except Exception as e:
-                mprint(f"Installation failed: {e}", file=sys.stderr)
+                    return False
 
     def create_venv(self):
         mprint("[EasyAMS][Func] Creating virtual environment...")
 
         # create venv using uv
         install_same_py_cmd = [
-            "uv", 
+            self.easyams_uv, 
             "python",
             "install",
             self.metashape_python_version
@@ -170,7 +169,7 @@ class Installer:
 
         # create venv using uv
         create_venv_cmd = [
-            "uv"
+            self.easyams_uv, 
             "venv",
             self.easyams_venv_folder.replace("\\", "/"),  # metashape path has spaces
             "--python",
@@ -218,20 +217,27 @@ class Installer:
             return self.venv_is_ready
         
     def check_dependencies(self):
-        self.get_venv_installed_package_info()
+        # self.get_venv_installed_package_info()
 
-        for dependency in self.required_packages:
-            if not self.check_one_package_in_venv(dependency):
-                self.not_installed_packages.append(dependency)
+        # for dependency in self.required_packages:
+        #     if not self.check_one_package_in_venv(dependency):
+        #         self.not_installed_packages.append(dependency)
 
-        if len(self.not_installed_packages) > 0:
-            self.package_is_ready = False
-            mprint(f"[EasyAMS][Func] Dependencies not satisfied")
-            return False
-        else:
-            self.package_is_ready = True
-            mprint(f"[EasyAMS][Func] Dependencies satisfied")
-            return True
+        # if len(self.not_installed_packages) > 0:
+        #     self.package_is_ready = False
+        #     mprint(f"[EasyAMS][Func] Dependencies not satisfied")
+        #     return False
+        # else:
+        #     self.package_is_ready = True
+        #     mprint(f"[EasyAMS][Func] Dependencies satisfied")
+        #     return True
+
+        cmd = [
+            self.easyams_uv,
+            '--version'
+        ]
+
+        is_okay = execude_command(cmd)
         
     def install_dependencies(self):
         mprint(f'[EasyAMS][Func] Installing dependencies...')
@@ -253,6 +259,24 @@ class Installer:
                 Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
             else:
                 mprint("[EasyAMS] Failed to install dependencies.")
+
+    def _install_easyams_dev(self):
+        cmd = [
+            self.easyams_venv_python_executable_file,
+            "-m",
+            "pip",
+            "install",
+            "-e",
+            self.easyams_installer_folder
+        ]
+
+        is_okay = self.execude_command(cmd)
+        if is_okay:
+            mprint("[EasyAMS] EasyAMS package installed successfully.")
+            Metashape.app.messageBox("EasyAMS successfully installed.")
+        else:
+            mprint("[EasyAMS] Failed to install EasyAMS package.")
+
 
     def add_venv_to_path(self):
         mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
@@ -310,24 +334,27 @@ class Installer:
     def main(self):
         mprint("[EasyAMS] Initializing the plugin...")
 
-        self.get_uv_execute_path()
+        if not self.is_uv_installed():
+            raise FileNotFoundError("[EasyAMS] Can not find system uv or plugin bulit-in uv for setting up dependencies")
 
         # create virtual envs
         if not self.venv_ready():
             self.create_venv()
 
         if self.venv_is_ready or self.venv_ready():
-            if not self.check_dependencies():
-                self.install_dependencies()
 
-            if not self.check_one_package_in_venv('easyams'):
-                self._install_easyams_dev()
+            self.check_dependencies()
+            # if not self.check_dependencies():
+            #     self.install_dependencies()
 
-            self.add_venv_to_path()
+            # if not self.check_one_package_in_venv('easyams'):
+            #     self._install_easyams_dev()
 
-            global requests
-            import requests
-            self.check_onnx_file_version()
+            # self.add_venv_to_path()
+
+            # global requests
+            # import requests
+            # self.check_onnx_file_version()
 
 
 class UvInstaller:
@@ -556,7 +583,7 @@ class UvInstaller:
         
         except Exception as e:
             print(f"Error installing uv for {platform_key}: {e}", file=sys.stderr)
-            
+
             if os.path.exists(temp_filename):
                 try:
                     os.unlink(temp_filename)
