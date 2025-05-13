@@ -26,11 +26,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: |
             **/pyproject.toml
-      - name: setup uv venv
+
       - run: uv sync
-
-      - name: build by uv
       - run: uv build
-
-      - name: publish by uv
       - run: uv publish
