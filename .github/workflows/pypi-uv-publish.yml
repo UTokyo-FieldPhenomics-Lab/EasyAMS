@@ -27,6 +27,8 @@ jobs:
         uses: astral-sh/setup-uv@v3
         with:
           enable-cache: true
-
-      - run: make build
+      
+      - run: uv venv
+      - run: uv sync
+      - run: uv build
       - run: uv publish
