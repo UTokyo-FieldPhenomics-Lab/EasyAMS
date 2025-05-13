@@ -1,10 +1,11 @@
 # gitignore in this project
-src/*
 *.pt
+uv.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.py[oc]
 *$py.class
 
 # C extensions
