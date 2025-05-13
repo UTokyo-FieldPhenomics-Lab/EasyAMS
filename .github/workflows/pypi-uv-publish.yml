@@ -1,0 +1,32 @@
+# copied and modified from: https://blog.ringsaturn.me/amp/posts/better-python-project-maintenance/
+name: publish by uv
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  pypi-publish:
+    name: upload release to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: PyPI
+      url: https://pypi.org/p/apopy
+    permissions:
+      id-token: write
+    env:
+      TRUSTED_PUBLISHING: always
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - run: make build
+      - run: uv publish
