@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: PyPI
-      url: https://pypi.org/p/apopy
+      url: https://pypi.org/p/easyams
     permissions:
       id-token: write
     env:
