@@ -24,12 +24,12 @@ def path_equal(path1, path2):
     abs_path2 = os.path.abspath(os.path.normpath(path2))
     return abs_path1 == abs_path2
 
-def execude_command(cmd):
+def execude_command(cmd, workdir=None):
     mprint(f"[CMD] {' '.join(cmd)}")
 
     try:
         # 使用 Popen 执行命令
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', cwd=workdir)
 
         # 实时读取标准输出
         for line in process.stdout:
@@ -56,6 +56,63 @@ def execude_command(cmd):
         return False
 
 
+def _download_with_curl(url: str, dest_path: str) -> None:
+        """使用 curl 下载（macOS/Linux 默认安装）"""
+        cmd = [
+            "curl", "-L", "--progress-bar",
+            "--output", dest_path,
+            "--fail",  # 确保HTTP错误时退出非0
+            url
+        ]
+        # subprocess.run(cmd, check=True)
+        execude_command(cmd)
+
+def _download_with_wget(url: str, dest_path: str) -> None:
+    """使用 wget 下载（Linux 常见，Windows需手动安装）"""
+    cmd = [
+        "wget", "--show-progress", "--progress=bar:force",
+        "-O", dest_path,
+        "--no-check-certificate",  # 跳过SSL验证（兼容性）
+        url
+    ]
+    # subprocess.run(cmd, check=True)
+    execude_command(cmd)
+
+def _download_with_builtin(url: str, dest_path: str) -> None:
+    """最终回退方案（Python内置库）"""
+
+    def report_hook(count: int, block_size: int, total_size: int) -> None:
+        percent = int(count * block_size * 100 / total_size)
+        mprint(f"\rDownloading... {percent}%", end="", flush=True)
+
+    try:
+        import urllib.request
+
+        urllib.request.urlretrieve(url, dest_path, reporthook=report_hook)
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to download uv packages: {str(e)}")
+
+def download_file(url: str, dest_path: str) -> None:
+    """Download a file from URL to destination path with progress."""
+
+    mprint(f"Downloading from {url} to {dest_path}")
+    # 尝试使用系统工具（按优先级顺序）
+    tools = ["curl", "wget"]
+    for tool in tools:
+        try:
+            if tool == "curl":
+                _download_with_curl(url, dest_path)
+            elif tool == "wget":
+                _download_with_wget(url, dest_path)
+            return
+        except (subprocess.SubprocessError, FileNotFoundError):
+            continue
+    
+    mprint("\nDownload completed")
+
+    _download_with_builtin(url, dest_path)
+
 class Installer:
 
     def __init__(self):
@@ -81,7 +138,7 @@ class Installer:
         if not os.path.exists(self.easyams_plugin_folder):
             os.makedirs(self.easyams_plugin_folder)
 
-        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, ".venv")
+        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
         self.easyams_bin_folder = os.path.join(self.easyams_plugin_folder, "bin")
 
         self.easyams_uv = os.path.join(self.easyams_bin_folder, "uv.exe" if self.system == "Windows" else "uv")
@@ -216,67 +273,25 @@ class Installer:
                 f"does not match with metashape python version {self.metashape_python_version}")
             return self.venv_is_ready
         
-    def check_dependencies(self):
-        # self.get_venv_installed_package_info()
-
-        # for dependency in self.required_packages:
-        #     if not self.check_one_package_in_venv(dependency):
-        #         self.not_installed_packages.append(dependency)
-
-        # if len(self.not_installed_packages) > 0:
-        #     self.package_is_ready = False
-        #     mprint(f"[EasyAMS][Func] Dependencies not satisfied")
-        #     return False
-        # else:
-        #     self.package_is_ready = True
-        #     mprint(f"[EasyAMS][Func] Dependencies satisfied")
-        #     return True
-
-        cmd = [
-            self.easyams_uv,
-            '--version'
-        ]
-
-        is_okay = execude_command(cmd)
-        
-    def install_dependencies(self):
+    def install_easyams_dependencies(self):
         mprint(f'[EasyAMS][Func] Installing dependencies...')
 
         if self.venv_is_ready or self.venv_ready():
-            Metashape.app.messageBox("During EasyAMS installation, the Metashape UI may stuck for a while, please wait patiently until finished.")
 
             cmd = [
-                self.easyams_venv_python_executable_file,
-                "-m",
+                self.easyams_uv,
                 "pip",
                 "install",
-                *self.not_installed_packages
+                "-U",
+                "easyams"
             ]
 
-            is_okay = execude_command(cmd)
+            is_okay = execude_command(cmd, workdir=self.easyams_venv_folder)
             if is_okay:
                 mprint("[EasyAMS] Dependencies installed successfully.")
-                Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
+                # Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
             else:
                 mprint("[EasyAMS] Failed to install dependencies.")
-
-    def _install_easyams_dev(self):
-        cmd = [
-            self.easyams_venv_python_executable_file,
-            "-m",
-            "pip",
-            "install",
-            "-e",
-            self.easyams_installer_folder
-        ]
-
-        is_okay = self.execude_command(cmd)
-        if is_okay:
-            mprint("[EasyAMS] EasyAMS package installed successfully.")
-            Metashape.app.messageBox("EasyAMS successfully installed.")
-        else:
-            mprint("[EasyAMS] Failed to install EasyAMS package.")
-
 
     def add_venv_to_path(self):
         mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
@@ -343,18 +358,16 @@ class Installer:
 
         if self.venv_is_ready or self.venv_ready():
 
-            self.check_dependencies()
-            # if not self.check_dependencies():
-            #     self.install_dependencies()
+            self.install_easyams_dependencies()
 
             # if not self.check_one_package_in_venv('easyams'):
             #     self._install_easyams_dev()
 
-            # self.add_venv_to_path()
+            self.add_venv_to_path()
 
-            # global requests
-            # import requests
-            # self.check_onnx_file_version()
+            global requests
+            import requests
+            self.check_onnx_file_version()
 
 
 class UvInstaller:
@@ -444,63 +457,6 @@ class UvInstaller:
         
         return False
 
-    def download_file(self, url: str, dest_path: str) -> None:
-        """Download a file from URL to destination path with progress."""
-
-        def _download_with_curl(url: str, dest_path: str) -> None:
-            """使用 curl 下载（macOS/Linux 默认安装）"""
-            cmd = [
-                "curl", "-L", "--progress-bar",
-                "--output", dest_path,
-                "--fail",  # 确保HTTP错误时退出非0
-                url
-            ]
-            # subprocess.run(cmd, check=True)
-            execude_command(cmd)
-
-        def _download_with_wget(url: str, dest_path: str) -> None:
-            """使用 wget 下载（Linux 常见，Windows需手动安装）"""
-            cmd = [
-                "wget", "--show-progress", "--progress=bar:force",
-                "-O", dest_path,
-                "--no-check-certificate",  # 跳过SSL验证（兼容性）
-                url
-            ]
-            # subprocess.run(cmd, check=True)
-            execude_command(cmd)
-
-        def _download_with_builtin(url: str, dest_path: str) -> None:
-            """最终回退方案（Python内置库）"""
-
-            def report_hook(count: int, block_size: int, total_size: int) -> None:
-                percent = int(count * block_size * 100 / total_size)
-                mprint(f"\rDownloading... {percent}%", end="", flush=True)
-
-            try:
-                import urllib.request
-
-                urllib.request.urlretrieve(url, dest_path, reporthook=report_hook)
-
-            except Exception as e:
-                raise RuntimeError(f"Failed to download uv packages: {str(e)}")
-            
-        mprint(f"Downloading from {url} to {dest_path}")
-        # 尝试使用系统工具（按优先级顺序）
-        tools = ["curl", "wget"]
-        for tool in tools:
-            try:
-                if tool == "curl":
-                    _download_with_curl(url, dest_path)
-                elif tool == "wget":
-                    _download_with_wget(url, dest_path)
-                return
-            except (subprocess.SubprocessError, FileNotFoundError):
-                continue
-       
-        mprint("\nDownload completed")
-
-        _download_with_builtin(url, dest_path)
-
 
     def install(self) -> bool:
         """
@@ -532,7 +488,7 @@ class UvInstaller:
         try:
             mprint(f"Downloading uv {self.version} for {platform_key}...")
             mprint(f"URL: {download_url}")
-            self.download_file(download_url, temp_filename)
+            download_file(download_url, temp_filename)
             mprint(f"Extracting {package_name} to {self.install_dir}...")
 
             #############################
