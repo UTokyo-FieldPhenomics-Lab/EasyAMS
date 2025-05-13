@@ -1,4 +1,4 @@
-__version__ = "2025.05.13"
+__version__ = "0.1.1"
 
 from . import (
     sahi_onnx, stag_gcp, img_loader, ui, utils, 
