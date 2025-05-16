@@ -2,7 +2,7 @@
 
 Easy Agisoft MetaShape (EasyAMS) Plugin with extended functions for smart agriculture.
 
-![img](docs/_static/gui.png)
+![img](docs/_static/gui.jpg)
 
 # How to use
 
@@ -12,6 +12,18 @@ Download the `tools/installer.py` in this project to your computer, and launch t
 
 ![img](docs/_static/launch.png)
 
+# Developer
+
+Please clone this repo to your local path.
+
+Then Install this plugin by chosing the installer located at `/Your/Local/Path/to/EasyAMS/tools/installer.py` with argument `--dev`. 
+
+![img](docs/_static/dev_setting.jpg)
+
+It will use folder at `/Your/Local/Path/to/EasyAMS/src/easyams/` as `easyams` source code package, after any modification, restart Metashape to make effects.
+
+If you have any modification for `installer.py`, rerun the `Run Python Script` with `--dev` arguement to refresh the cached installer file at `User\AppData\Local\Agisoft\Metashape Pro\scripts\easyams_launcher.py`. Please refer 
+[How to run Python script automatically on Metashape Professional start : Helpdesk Portal](https://agisoft.freshdesk.com/support/solutions/articles/31000133123-how-to-run-python-script-automatically-on-metashape-professional-start) for more details.
 
 # Error Fixs
 

@@ -1,15 +1,14 @@
 import os
-import re
 import sys
 import platform
 import shutil
-import hashlib
 import subprocess
 
 # uv installer dependencies
 import tempfile
 import tarfile
 import zipfile
+
 from typing import Dict, Optional, Tuple
 
 import Metashape
@@ -138,7 +137,7 @@ class Installer:
         if not os.path.exists(self.easyams_plugin_folder):
             os.makedirs(self.easyams_plugin_folder)
 
-        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, "venv")
+        self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, ".venv")
         self.easyams_bin_folder = os.path.join(self.easyams_plugin_folder, "bin")
 
         self.easyams_uv = os.path.join(self.easyams_bin_folder, "uv.exe" if self.system == "Windows" else "uv")
@@ -146,15 +145,6 @@ class Installer:
         # install status checker
         self.venv_is_ready = False
         self.package_is_ready = False
-
-        # git downloader
-        self.gitdown = GitReleaseDownloader(
-            repo="UTokyo-FieldPhenomics-Lab/EasyAMS",  # 替换为实际的 GitHub 仓库路径
-            save_path=self.easyams_plugin_folder,  # 替换为实际的保存路径
-            file_name="yolo11_stag",  # 文件基础名称
-            suffix="onnx",  # 文件后缀
-            # token="your_github_token"  # 可选：GitHub 个人访问令牌
-        )
 
     def get_metashape_scripts_path(self):
 
@@ -273,18 +263,29 @@ class Installer:
                 f"does not match with metashape python version {self.metashape_python_version}")
             return self.venv_is_ready
         
-    def install_easyams_dependencies(self):
+    def install_easyams_dependencies(self, dev=False):
         mprint(f'[EasyAMS][Func] Installing dependencies...')
 
         if self.venv_is_ready or self.venv_ready():
 
-            cmd = [
-                self.easyams_uv,
-                "pip",
-                "install",
-                "-U",
-                "easyams"
-            ]
+            if dev:
+                cmd = [
+                    self.easyams_uv,
+                    "pip",
+                    "install",
+                    "-e",
+                    # easyams/tools/ -> easyams/ as dev root path
+                    os.path.dirname( self.easyams_installer_folder )
+                ]
+
+            else:
+                cmd = [
+                    self.easyams_uv,
+                    "pip",
+                    "install",
+                    "-U",
+                    "easyams"
+                ]
 
             is_okay = execude_command(cmd, workdir=self.easyams_venv_folder)
             if is_okay:
@@ -318,35 +319,53 @@ class Installer:
                 sys.path.insert(0, site_packages_folder)
 
                 # link editable easyams folder for dev
-                for item in os.listdir(site_packages_folder):
-                    if item.endswith('.egg-link'):
-                        with open(os.path.join(site_packages_folder, item), 'r') as f:
-                            # .egg-link 文件的第一行是包的路径
-                            package_path = f.readline().strip()
-                            if os.path.exists(package_path):
-                                sys.path.insert(0, package_path)
+                self._add_pip_linked_install(site_packages_folder)
+
             else:
                 Metashape.app.messageBox(
                     f"[EasyAMS] venv missing site-package folders of '{site_packages_folder}'"
                 )
 
-    def check_onnx_file_version(self):
-        # 检查是否需要更新
-        is_outdated, local_version, github_version = self.gitdown.outdated(return_versions=True)
-        if is_outdated:
-            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{github_version} is available.")
-            latest_version = self.gitdown.update()
-        else:
-            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is up-to-date.")
+    def _add_pip_linked_install(self, site_packages_folder):
+        for item in os.listdir(site_packages_folder):
+            if not ( item.endswith('.egg-link') or  item.endswith('.pth') ):
+                continue
 
-    
-    def get_onnx_file(self):
-        latest_version = self.gitdown.local_version()
+            if not 'easyams' in item:
+                continue
 
-        return os.path.join(self.easyams_plugin_folder, f"yolo11_stag_v{latest_version}.onnx")
+            with open(os.path.join(site_packages_folder, item), 'r') as f:
+                # .egg-link / .pth 文件的第一行是包的路径
+                package_path = f.readline().strip()
+                if os.path.exists(package_path):
+                    mprint(f'inserting .egg-link or .pth {package_path} to path')
+                    sys.path.insert(0, package_path)
+
+    def copy_installer_to_launch_folder(self):
+        """
+        将当前运行的 Python 脚本复制到指定目录
+        :param target_dir: 目标目录，如果为 None 则使用 self.save_path
+        """
+        # 获取当前运行的脚本路径
+        current_script = os.path.abspath(__file__)
+        target_path = os.path.join(self.metashape_user_script_folder, 'easyams_launcher.py')
+        mprint(target_path)
+        
+        # 如果目标路径与当前路径相同，则跳过
+        if os.path.abspath(target_path) == os.path.abspath(current_script):
+            print(f"[Info] Source and destination are the same: {current_script}")
+            return
+            
+        try:
+            # 复制文件
+            shutil.copy2(current_script, target_path)
+            print(f"[Success] Copied installer to: {target_path}")
+        except Exception as e:
+            print(f"[Error] Failed to copy installer: {str(e)}")
+            raise
 
 
-    def main(self):
+    def main(self, dev=False):
         mprint("[EasyAMS] Initializing the plugin...")
 
         if not self.is_uv_installed():
@@ -358,16 +377,11 @@ class Installer:
 
         if self.venv_is_ready or self.venv_ready():
 
-            self.install_easyams_dependencies()
-
-            # if not self.check_one_package_in_venv('easyams'):
-            #     self._install_easyams_dev()
+            self.install_easyams_dependencies(dev)
 
             self.add_venv_to_path()
 
-            global requests
-            import requests
-            self.check_onnx_file_version()
+            self.copy_installer_to_launch_folder()
 
 
 class UvInstaller:
@@ -553,208 +567,21 @@ class UvInstaller:
             except OSError as cleanup_error:
                 print(f"Warning: Failed to clean up directory: {cleanup_error}", file=sys.stderr)
             return False
-    
-    
-
-class GitReleaseDownloader:
-    MAX_RELEASE_CHECKS = 5  # 最多检查多少个历史release
-    def __init__(self, repo: str, save_path: str, file_name: str, suffix: str, token: str = None):
-        """
-        初始化 GitReleaseDownloader 实例
-        :param repo: GitHub 仓库路径，格式为 "org/repo"
-        :param save_path: 本地保存文件的路径
-        :param file_name: 文件的基础名称（不包含版本号和后缀）
-        :param suffix: 文件后缀（如 "onnx"）
-        :param token: 可选，GitHub 个人访问令牌，用于认证
-        """
-        self.repo = repo
-        self.save_path = save_path
-        self.file_name = file_name
-        self.suffix = suffix
-        self.token = token
-        self.headers = {"Authorization": f"token {token}"} if token else {}
-
-        # 确保保存路径存在
-        if not os.path.exists(save_path):
-            os.makedirs(save_path, exist_ok=True)
-
-    def local_version(self) -> int:
-        """
-        获取本地文件的版本号
-        :return: 本地文件的版本号（整数），如果不存在则返回 0
-        """
-        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
-        files = os.listdir(self.save_path)
-        for file in files:
-            match = pattern.match(file)
-            if match:
-                return int(match.group(1))
-        return 0
-
-    def _find_matching_asset(self, assets: list, version: Optional[int] = None) -> Tuple[Optional[int], Optional[str], Optional[str]]:
-        """
-        在assets列表中查找匹配的文件
-        :param assets: GitHub Release的assets列表
-        :param version: 如果指定，则查找特定版本的文件
-        :return: (版本号, 下载URL, SHA256文件URL)
-        """
-        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
-        download_url = None
-        found_version = None
-        sha256_url = None
-        for asset in assets:
-            match = pattern.match(asset["name"])
-            if match:
-                current_version = int(match.group(1))
-                if version is None or current_version == version:
-                    found_version = current_version
-                    if "sha256" not in asset["name"]:
-                        download_url = asset["browser_download_url"]
-                # 查找 SHA256 校验文件
-                if asset["name"] == f"{self.file_name}_v{current_version}.sha256":
-                    sha256_url = asset["browser_download_url"]
-        return found_version, download_url, sha256_url
-
-    def git_release_version(self, max_checks: int = MAX_RELEASE_CHECKS) -> int:
-        """
-        获取 GitHub Releases 中最新文件的版本号
-        :param max_checks: 最多检查多少个历史release
-        :return: 最新文件的版本号（整数）
-        :raises: 如果没有找到匹配的文件，则抛出异常
-        """
-        # 首先检查最新release
-        url = f"https://api.github.com/repos/{self.repo}/releases/latest"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            release_data = response.json()
-            version, _, _ = self._find_matching_asset(release_data.get("assets", []))
-            if version is not None:
-                return version
-        # 如果最新release没有，则检查历史release
-        url = f"https://api.github.com/repos/{self.repo}/releases"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch releases: {response.status_code}, {response.text}")
-        releases = response.json()
-        for i, release in enumerate(releases[:max_checks]):
-            version, _, _ = self._find_matching_asset(release.get("assets", []))
-            if version is not None:
-                return version
-        raise Exception(f"No matching file found in the last {max_checks} releases for pattern: {self.file_name}_v?.{self.suffix}")
-
-    def outdated(self, return_versions=False) -> bool:
-        """
-        检查本地文件是否过期
-        :return: 如果本地文件版本低于 GitHub 最新版本，则返回 True，否则返回 False
-        """
-        local_version = self.local_version()
-        github_version = self.git_release_version()
-        is_outdated = github_version > local_version
-        if return_versions:
-            return is_outdated, local_version, github_version
-        else:
-            return is_outdated
-
-    def update(self):
-        """
-        更新本地文件到最新版本
-        :raises: 如果下载失败或文件校验失败，则抛出异常
-        """
-        # 首先尝试最新release
-        url = f"https://api.github.com/repos/{self.repo}/releases/latest"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            release_data = response.json()
-            latest_version, download_url, sha256_url = self._find_matching_asset(release_data.get("assets", []))
-            if latest_version is not None:
-                return self._download_and_verify(latest_version, download_url, sha256_url)
-        # 如果最新release没有，则检查历史release
-        url = f"https://api.github.com/repos/{self.repo}/releases"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code != 200:
-            raise Exception(f"Failed to fetch releases: {response.status_code}, {response.text}")
-        releases = response.json()
-        for release in releases[:self.MAX_RELEASE_CHECKS]:
-            version, download_url, sha256_url = self._find_matching_asset(release.get("assets", []))
-            if version is not None:
-                return self._download_and_verify(version, download_url, sha256_url)
-        raise Exception(f"No matching file found in the last {self.MAX_RELEASE_CHECKS} releases for pattern: {self.file_name}_v?.{self.suffix}")
-
-    def _download_and_verify(self, version: int, download_url: str, sha256_url: Optional[str]) -> int:
-        """
-        下载文件并验证其完整性
-        :param version: 文件版本号
-        :param download_url: 文件下载URL
-        :param sha256_url: SHA256校验文件URL
-        :return: 下载的版本号
-        """
-        # 下载文件
-        local_file_path = os.path.join(self.save_path, f"{self.file_name}_v{version}.{self.suffix}")
-        print(f"Downloading {download_url} to {local_file_path} ...")
-        with requests.get(download_url, headers=self.headers, stream=True) as r:
-            if r.status_code != 200:
-                raise Exception(f"Failed to download file: {r.status_code}, {r.text}")
-            with open(local_file_path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
-        # 下载并校验 SHA256
-        if sha256_url:
-            print("Verifying file integrity using SHA256...")
-            sha256_hash = self._download_sha256(sha256_url)
-            if not self._verify_file_sha256(local_file_path, sha256_hash):
-                os.remove(local_file_path)  # 删除下载的无效文件
-                raise Exception("SHA256 verification failed. The downloaded file is corrupted or tampered.")
-        else:
-            print("Warning: No SHA256 checksum file found, skipping verification")
-        # 删除旧文件
-        self._delete_old_files(version)
-        print(f"[EasyAMS] Update complete. Version: v{version}")
-        return version
-
-    def _download_sha256(self, sha256_url: str) -> str:
-        """
-        下载 SHA256 校验文件
-        :param sha256_url: SHA256文件的URL
-        :return: SHA256 校验值
-        """
-        response = requests.get(sha256_url, headers=self.headers)
-        if response.status_code != 200:
-            raise Exception(f"Failed to download SHA256 file: {response.status_code}, {response.text}")
-        return response.text.strip()
-
-    def _delete_old_files(self, latest_version: int):
-        """
-        删除旧版本的文件
-        :param latest_version: 最新版本号
-        """
-        pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
-        files = os.listdir(self.save_path)
-        for file in files:
-            match = pattern.match(file)
-            if match:
-                version = int(match.group(1))
-                if version < latest_version:
-                    old_file_path = os.path.join(self.save_path, file)
-                    os.remove(old_file_path)
-                    print(f"Deleted old file: {old_file_path}")
-                    
-    def _verify_file_sha256(self, file_path: str, sha256_hash: str) -> bool:
-        """
-        校验文件的 SHA256 值
-        :param file_path: 文件路径
-        :param sha256_hash: 预期的 SHA256 值
-        :return: 如果校验通过返回 True，否则返回 False
-        """
-        sha256 = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                sha256.update(chunk)
-        calculated_hash = sha256.hexdigest()
-        return calculated_hash == sha256_hash
         
 
 if __name__ == "__main__":
     installer = Installer()
+
+    if len(sys.argv) > 1:
+        dev_option = ['--dev', '-D', '-d']
+        try:
+            if sys.argv[1] in dev_option:
+                is_dev = True
+            else:
+                is_dev = False
+            mprint(f"Set to develop mode")
+        except ValueError:
+            mprint(f"Input developer mode value [{sys.argv[1]}] should in {dev_option}")
 
     if path_equal(installer.easyams_installer_folder, installer.metashape_user_script_folder):
         # the installer is installed correctly (inside the metashape script launcher folder)
@@ -765,5 +592,5 @@ if __name__ == "__main__":
         ams.ui.add_metashape_menu()
 
     else:
-        installer.main()
+        installer.main(is_dev)
         installer.print_paths()
