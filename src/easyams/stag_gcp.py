@@ -1,92 +1,129 @@
 import cv2
 import os
-# from PySide2 import QtCore
+from PySide2 import QtWidgets, QtCore, QtGui
 
 import numpy as np
+import stag
 import Metashape
 
-import stag
+from dataclasses import dataclass, field
 
 from .sahi_onnx import AutoDetectionModel
 from .sahi_onnx.predict import get_sliced_prediction
 
-from .utils import mprint
 from .ui import ProgressDialog
 
 def detect_stag_markers():
-    doc = Metashape.app.document
-    chunk = doc.chunk
+    app = QtWidgets.QApplication.instance()  # 获取当前Qt应用实例
+    window = StagDetector(app.activeWindow())
+    window.exec_()  # 使用exec_()而非show()确保模态性
 
-    from . import system_info
-    # 检查 onnx 文件是否存在
-    if system_info is None or not os.path.exists(system_info.onnx_file):
-        raise FileNotFoundError("[EasyAMS] could not find onnx file")
-    
-    # here need to popup a ui with following choices
-    # :target type: stag HD17, stag HD19, etc
-    # :Tolerance: 0-1, # confidence threshold of model
-    # :maximum residual (pixel): 500 (by default, not execeed 1000 for stag-python detection)
-    # :process selected images only: bool
-    # :ignore masked image regions: bool
-    params = {
-        "code_bit": 19,
-        "onnx_model_path": system_info.onnx_file,
-        "threshold": 0.7,
-        "max_residual": 500,
-        "only_selected_img": False,
-        "ignore_mask": False
-    }
+class StagDetector(QtWidgets.QDialog):
 
-    # 创建进度对话框
-    progress_dialog = ProgressDialog()
-    progress_dialog.show()
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Detect Markers")
+        self.setMinimumSize(400, 250)
 
-    # 创建并启动线程
-    thread = DetectMarkersThread(chunk, params, progress_dialog)
-    # thread.start()
-    thread.run()
+        from . import system_info
+        self.system_info = system_info
 
-def detect_all_stag_markers():
-    doc = Metashape.app.document
-    chunks = doc.chunks
+        self.onnx = None
+        self.init_onnx_file()
 
-    from . import system_info
-    # 检查 onnx 文件是否存在
-    if system_info is None or not os.path.exists(system_info.onnx_file):
-        raise FileNotFoundError("[EasyAMS] could not find onnx file")
-    
-    # here need to popup a ui with following choices
-    # :target type: stag HD17, stag HD19, etc
-    # :Tolerance: 0-1, # confidence threshold of model
-    # :maximum residual (pixel): 500 (by default, not execeed 1000 for stag-python detection)
-    # :process selected images only: bool
-    # :ignore masked image regions: bool
-    params = {
-        "code_bit": 19,
-        "onnx_model_path": system_info.onnx_file,
-        "threshold": 0.7,
-        "max_residual": 500,
-        "only_selected_img": False,
-        "ignore_mask": False
-    }
+        self.create_ui()
 
 
-    for chunk in chunks:
-        if not chunk.enabled:
-            pass
+    def init_onnx_file(self):
+        # 检查是否需要更新
+        is_outdated, local_version, github_version = self.system_info.onnx.outdated(return_versions=True)
+        
+        if is_outdated:
+            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{github_version} is available.")
+            self.system_info.onnx.update()
+        else:
+            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is up-to-date.")
 
-        mprint(f"[EasyAMS] Processing chunk [{chunk.label}]")
 
-        # 创建进度对话框
-        progress_dialog = ProgressDialog()
-        progress_dialog.show()
+    def create_ui(self):
 
-        # 创建并启动线程
-        thread = DetectMarkersThread(chunk, params, progress_dialog)
-        # thread.start()
-        thread.run()
+        layout = QtWidgets.QVBoxLayout()
+        
+        # Parameters Group
+        params_group = QtWidgets.QGroupBox("Parameters")
+        params_layout = QtWidgets.QFormLayout()
 
-# class DetectMarkersThread(QtCore.QThread):
+        # 1. Target Type
+        self.target_type_combo = QtWidgets.QComboBox()
+        self.target_type_combo.addItems(["Stag 11 bit", "Stag 13 bit", "Stag 15 bit", "Stag 17 bit", "Stag 19 bit", "Stag 21 bit", "Stag 23 bit"])
+        self.target_type_combo.setCurrentIndex(4)  # Default to 'Stag 19 bit'
+        params_layout.addRow("Target Type:", self.target_type_combo)
+
+        # 2. Tolerance
+        self.tolerance_input = QtWidgets.QSpinBox()
+        self.tolerance_input.setRange(0, 100)
+        self.tolerance_input.setValue(70)  # Default to 70
+        self.tolerance_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+        self.tolerance_slider.setRange(0, 100)
+        self.tolerance_slider.setValue(70)
+        self.tolerance_slider.valueChanged.connect(self.tolerance_input.setValue)
+        self.tolerance_input.valueChanged.connect(self.tolerance_slider.setValue)
+        
+        tolerance_layout = QtWidgets.QHBoxLayout()
+        tolerance_layout.addWidget(self.tolerance_input)
+        tolerance_layout.addWidget(self.tolerance_slider)
+        params_layout.addRow("Tolerance:", tolerance_layout)
+
+        # 3. Max Residual
+        self.max_residual_input = QtWidgets.QSpinBox()
+        self.max_residual_input.setRange(0, 10000)
+        self.max_residual_input.setValue(500)  # Default to 500
+        self.max_residual_input.setSingleStep(100)  # 将步长设置为 100
+        params_layout.addRow("Maximum Residual (pix):", self.max_residual_input)
+
+        # 4. Process selected images only
+        self.process_selected_checkbox = QtWidgets.QCheckBox("Process selected images only (in dev)")
+        self.process_selected_checkbox.setEnabled(False)
+        params_layout.addRow(self.process_selected_checkbox)
+
+        # 5. Ignore masked image regions
+        self.ignore_mask_checkbox = QtWidgets.QCheckBox("Ignore masked image regions (in dev)")
+        self.ignore_mask_checkbox.setEnabled(False)
+        params_layout.addRow(self.ignore_mask_checkbox)
+
+        # 6. Merge with existing markers
+        self.merge_with_exists_checkbox = QtWidgets.QCheckBox("Merge with existing markers (in dev)")
+        self.merge_with_exists_checkbox.setEnabled(False)
+        params_layout.addRow(self.merge_with_exists_checkbox)
+
+        # 7. Execute on all chunks
+        self.run_all_chunks = QtWidgets.QCheckBox("Run all chunks")
+        self.run_all_chunks.setChecked(False)
+        params_layout.addRow(self.run_all_chunks)
+
+        # Close Parameters Group
+        params_group.setLayout(params_layout)
+        layout.addWidget(params_group)
+
+        # OK and Cancel buttons
+        buttons = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+    def get_parameters(self):
+        return  {
+            "code_bit": int(self.target_type_combo.currentText().split()[1]),
+            "code_type": 'stag',
+            "threshold": self.tolerance_input.value() / 100.0,
+            "max_residual": self.max_residual_input.value(),
+            "only_selected_img": self.process_selected_checkbox.isChecked(),
+            "ignore_mask": self.ignore_mask_checkbox.isChecked(),
+            "merge_with_exists": self.merge_with_exists_checkbox.isChecked(),
+            "run_all_chunks": self.run_all_chunks.isChecked(),
+        }
+
 class DetectMarkersThread:
     def __init__(self, chunk, params, progress_dialog):
         super().__init__()
@@ -143,6 +180,7 @@ class DetectMarkersThread:
         mprint(f"[EasyAMS] processing image [{camera.label}] ")
 
         # read cv2 to memory
+        # ignore the image rotations
         img_array = cv2.imread(camera.photo.path, cv2.IMREAD_COLOR|cv2.IMREAD_IGNORE_ORIENTATION)
         self.progress_dialog.update_sub_progress(10)
         mprint(f"    |--- image read with size [{img_array.shape}] ")

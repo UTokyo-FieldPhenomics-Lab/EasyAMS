@@ -1,12 +1,12 @@
 import os
 import json
-from PySide2.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PySide2.QtWidgets import (QWidget, QApplication, QVBoxLayout, QHBoxLayout, QPushButton, 
                               QTreeWidget, QTreeWidgetItem, QFileDialog,
                               QCheckBox, QLabel, QMessageBox, QDialog, QScrollArea)
 from PySide2.QtCore import Qt
 import Metashape
 
-from .utils import PathManager
+from .utils import ConfigManager
 
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
@@ -62,14 +62,15 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         self.root_path = ""
         self.img_ext = ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
 
-        self.path_manager = PathManager()
+        from . import system_info
+        self.config_manager = ConfigManager(system_info.config_file)
     
     def select_folder(self):
-        last_path = self.path_manager.load_last_batch_import_path()
+        last_path = self.config_manager.load_last_batch_import_path()
         folder = QFileDialog.getExistingDirectory(self, "Select Root Image Folder", dir=last_path)
 
         if folder:
-            self.path_manager.save_last_batch_import_path(folder)
+            self.config_manager.save_last_batch_import_path(folder)
 
             self.root_path = folder
             self.folder_path.setText(folder)
@@ -360,7 +361,6 @@ Root/
         help_dialog.exec_()
 
 def create_batch_image_loader():
-    from PySide2 import QtWidgets
-    app = QtWidgets.QApplication.instance()  # 获取当前Qt应用实例
+    app = QApplication.instance()  # 获取当前Qt应用实例
     window = BatchImageLoader(app.activeWindow())
     window.exec_()  # 使用exec_()而非show()确保模态性

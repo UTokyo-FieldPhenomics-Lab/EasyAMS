@@ -9,7 +9,6 @@ def add_metashape_menu():
 
     # stag_gcp function
     Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", stag_gcp.detect_stag_markers)
-    Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers in all chunks", stag_gcp.detect_all_stag_markers)
     # Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
 
     # -----------------------
