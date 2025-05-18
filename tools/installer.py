@@ -1,3 +1,5 @@
+__version__ = "0.1.1"
+
 import os
 import sys
 import platform
@@ -382,6 +384,8 @@ class Installer:
             self.add_venv_to_path()
 
             self.copy_installer_to_launch_folder()
+
+            Metashape.messageBox("EasyAMS plugin installed successfully, please restart Metashape to take effects")
 
 
 class UvInstaller:
