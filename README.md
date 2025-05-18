@@ -84,3 +84,8 @@ It will create a `.venv` at current project folder and install the `tests` depen
 ```
 
 [Solution](https://github.com/electron-userland/electron-builder-binaries/issues/47): `sudo pacman -S --needed libxcrypt libxcrypt-compat` 
+
+### 2. SSLError("Can't connect to HTTPS URL because the SSL modules is not available")
+
+This only happens on Manjaro PC, installing openssl-1.1 from pacman solved this problem.
+[python - SSLError("Can't connect to HTTPS URL because the SSL module is not available.") in pip command - Stack Overflow](https://stackoverflow.com/questions/63084049/sslerrorcant-connect-to-https-url-because-the-ssl-module-is-not-available)

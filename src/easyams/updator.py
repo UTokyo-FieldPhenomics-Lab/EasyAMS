@@ -174,20 +174,20 @@ class UpdateDialog(QDialog):
             return False
 
     def update_package(self):
-        is_dev = self.system_info.config_manager.get('is_dev')
+        is_dev = self.system_info.config_manager.load('is_dev')
         if is_dev:
             Metashape.app.messageBox("Can not update editable package when installed in dev mode, please use git to update your source code folder")
             return False
         else:
             cmd = [
-                system_info.easyams_uv,
+                self.system_info.easyams_uv,
                 "pip",
                 "install",
                 "-U",
                 "easyams"
             ]
 
-            is_okay = execude_command(cmd, workdir=self.easyams_venv_folder)
+            is_okay = execude_command(cmd, workdir=self.system_info.easyams_venv_folder)
             if is_okay:
                 mprint("[EasyAMS] Packages updated successfully via uv.")
                 return True

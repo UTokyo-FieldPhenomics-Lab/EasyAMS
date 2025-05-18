@@ -23,7 +23,7 @@ def add_metashape_menu():
     # check for updates
     ver, has_updates = updator.check_updates()
     if has_updates:
-        Metashape.app.messageBox("EasyAMS Update available, please check for updates in the menu.")
+        Metashape.app.messageBox("EasyAMS update available, please check for updates in the menu.")
 
 def show_about_dialog():
     
