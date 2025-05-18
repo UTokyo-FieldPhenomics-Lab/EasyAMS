@@ -102,7 +102,7 @@ class GitReleaseDownloader:
         :param token: 可选，GitHub 个人访问令牌，用于认证
         """
         self.repo = repo
-        self.save_path = save_folder
+        self.save_folder = save_folder
         self.file_name = file_name
         self.suffix = suffix
         self.token = token
@@ -118,7 +118,7 @@ class GitReleaseDownloader:
         :return: 本地文件的版本号（整数），如果不存在则返回 0
         """
         pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
-        files = os.listdir(self.save_path)
+        files = os.listdir(self.save_folder)
         for file in files:
             match = pattern.match(file)
             if match:
@@ -235,7 +235,7 @@ class GitReleaseDownloader:
         :return: 下载的版本号
         """
         # 下载文件
-        local_file_path = os.path.join(self.save_path, f"{self.file_name}_v{version}.{self.suffix}")
+        local_file_path = os.path.join(self.save_folder, f"{self.file_name}_v{version}.{self.suffix}")
         print(f"Downloading {download_url} to {local_file_path} ...")
         with requests.get(download_url, headers=self.headers, stream=True) as r:
             if r.status_code != 200:
@@ -276,13 +276,13 @@ class GitReleaseDownloader:
         :param latest_version: 最新版本号
         """
         pattern = re.compile(rf"{self.file_name}_v(\d+)\.{self.suffix}")
-        files = os.listdir(self.save_path)
+        files = os.listdir(self.save_folder)
         for file in files:
             match = pattern.match(file)
             if match:
                 version = int(match.group(1))
                 if version < latest_version:
-                    old_file_path = os.path.join(self.save_path, file)
+                    old_file_path = os.path.join(self.save_folder, file)
                     os.remove(old_file_path)
                     print(f"Deleted old file: {old_file_path}")
 

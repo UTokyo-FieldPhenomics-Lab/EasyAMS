@@ -6,12 +6,11 @@ import numpy as np
 import stag
 import Metashape
 
-from dataclasses import dataclass, field
-
 from .sahi_onnx import AutoDetectionModel
 from .sahi_onnx.predict import get_sliced_prediction
 
 from .ui import ProgressDialog
+from .utils import mprint
 
 def detect_stag_markers():
     app = QtWidgets.QApplication.instance()  # 获取当前Qt应用实例
@@ -25,14 +24,14 @@ class StagDetector(QtWidgets.QDialog):
         self.setWindowTitle("Detect Markers")
         self.setMinimumSize(400, 250)
 
+        self.doc = Metashape.app.document
+
         from . import system_info
         self.system_info = system_info
 
-        self.onnx = None
         self.init_onnx_file()
 
         self.create_ui()
-
 
     def init_onnx_file(self):
         # 检查是否需要更新
@@ -48,7 +47,39 @@ class StagDetector(QtWidgets.QDialog):
     def create_ui(self):
 
         layout = QtWidgets.QVBoxLayout()
-        
+
+        layout_top_form = QtWidgets.QFormLayout()
+        # Apply to dropdown menu
+        self.run_chunk_option = QtWidgets.QComboBox()
+        self.run_chunk_option.addItems(["Active chunk", "All chunks", "Selection"])
+        self.run_chunk_option.setCurrentIndex(0)
+        # 添加标签和下拉菜单到水平布局
+        layout_top_form.addRow("Apply to:", self.run_chunk_option)
+
+        # 将水平布局添加到主布局
+        layout.addLayout(layout_top_form)
+
+        # Checkbox list for chunks
+        self.chunk_list_widget = QtWidgets.QListWidget()
+        self.chunk_list_widget.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
+        self.chunk_list_widget.setFixedHeight(180)
+        layout.addWidget(self.chunk_list_widget)
+
+        # Populate chunk list
+        for chunk in self.doc.chunks:
+            if chunk.enabled:
+                label_str = f"🟦 {chunk.label}"
+            else:
+                label_str = f"⛔ {chunk.label}"
+            item = QtWidgets.QListWidgetItem(label_str)
+            item.setFlags(item.flags() | QtCore.Qt.ItemIsUserCheckable)
+            item.setCheckState(QtCore.Qt.Unchecked)
+            self.chunk_list_widget.addItem(item)
+
+        # Connect signals
+        self.run_chunk_option.currentIndexChanged.connect(self._update_chunk_selection)
+        self._update_chunk_selection()
+
         # Parameters Group
         params_group = QtWidgets.QGroupBox("Parameters")
         params_layout = QtWidgets.QFormLayout()
@@ -96,11 +127,6 @@ class StagDetector(QtWidgets.QDialog):
         self.merge_with_exists_checkbox.setEnabled(False)
         params_layout.addRow(self.merge_with_exists_checkbox)
 
-        # 7. Execute on all chunks
-        self.run_all_chunks = QtWidgets.QCheckBox("Run all chunks")
-        self.run_all_chunks.setChecked(False)
-        params_layout.addRow(self.run_all_chunks)
-
         # Close Parameters Group
         params_group.setLayout(params_layout)
         layout.addWidget(params_group)
@@ -112,8 +138,41 @@ class StagDetector(QtWidgets.QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
-    def get_parameters(self):
-        return  {
+    def _update_chunk_selection(self):
+        mode = self.run_chunk_option.currentText()
+        if mode == "All chunks":
+            self._set_all_options_checked(True)
+            self.chunk_list_widget.setDisabled(True)
+        elif mode == "Active chunk":
+            self._set_all_options_checked(False)
+            self.chunk_list_widget.item(self.doc.chunk.key).setCheckState(QtCore.Qt.Checked)  # Example: select first chunk
+            self.chunk_list_widget.setDisabled(True)
+        else:
+            self.chunk_list_widget.setDisabled(False)
+
+    def _set_all_options_checked(self, checked):
+        state = QtCore.Qt.Checked if checked else QtCore.Qt.Unchecked
+        for i in range(self.chunk_list_widget.count()):
+            self.chunk_list_widget.item(i).setCheckState(state)
+
+    def _get_selected_chunks(self):
+        chunk_list = []
+        for i in range(self.chunk_list_widget.count()):
+            item = self.chunk_list_widget.item(i)
+            checked_state = item.checkState()
+            if checked_state == QtCore.Qt.Checked:
+                chunk_list.append( self.doc.chunks[i] )
+
+        return chunk_list
+    
+    def reject(self):
+        # 在这里添加自定义的 reject 功能
+        print("Cancel button was clicked")
+        super().reject()  # 调用父类的 reject 方法关闭对话框
+
+    def accept(self):
+        self.params = {
+            "run_chunk": self.run_chunk_option.currentText(),
             "code_bit": int(self.target_type_combo.currentText().split()[1]),
             "code_type": 'stag',
             "threshold": self.tolerance_input.value() / 100.0,
@@ -121,36 +180,36 @@ class StagDetector(QtWidgets.QDialog):
             "only_selected_img": self.process_selected_checkbox.isChecked(),
             "ignore_mask": self.ignore_mask_checkbox.isChecked(),
             "merge_with_exists": self.merge_with_exists_checkbox.isChecked(),
-            "run_all_chunks": self.run_all_chunks.isChecked(),
         }
 
-class DetectMarkersThread:
-    def __init__(self, chunk, params, progress_dialog):
-        super().__init__()
-        self.chunk = chunk
-        self.cameras = chunk.cameras
-        self.params = params
-        self.progress_dialog = progress_dialog
+        chunk_list = self._get_selected_chunks()
+        mprint(chunk_list)
 
-    def run(self):
-        # 初始化 YOLO 检测器
-        yolo = StagYoloDetector(self.params['onnx_model_path'], thresh=self.params['threshold'])
+        self.yolo = StagYoloDetector(self.system_info.onnx.file_path, thresh=self.params['threshold'])
+        for idx, chunk in enumerate(chunk_list):
+            self.process_one_chunk(chunk, title_suffix=f"({idx}/{len(chunk_list)})")
 
-        self.progress_dialog.update_total_progress(10)  # 10%
+        super().accept()
+
+
+    def process_one_chunk(self, chunk, title_suffix=""):
+        # 创建进度对话框
+        self.progress_dialog = ProgressDialog(parent=self, window_title=f"Detecting Stag Markers {title_suffix}")
+        self.progress_dialog.show()
 
         # 总进度
-        total_cameras = len(self.cameras)
-        for i, camera in enumerate(self.cameras):
+        total_cameras = len(chunk.cameras)
+        for i, camera in enumerate(chunk.cameras):
             # 更新总进度
-            total_progress = 10 + int((i + 1) / total_cameras * 80)
+            total_progress = int((i + 1) / total_cameras * 90)
             self.progress_dialog.update_total_progress(total_progress)
 
             # 处理每个相机
-            self.process_camera(camera, yolo)
+            self.process_camera(chunk, camera)
             
             # self.process_camera_stag_native(camera, self.params['code_bit'])
 
-        # back results to chunks
+        self.progress_dialog.reject()
 
     def process_camera_stag_native_api(self, camera, code_bit):
         # read cv2 to memory
@@ -175,7 +234,7 @@ class DetectMarkersThread:
                 self.place_marker_on_photo(self.chunk, camera, marker_label, marker_center)
 
 
-    def process_camera(self, camera, yolo):
+    def process_camera(self, chunk, camera):
         self.progress_dialog.update_sub_progress(0)
         mprint(f"[EasyAMS] processing image [{camera.label}] ")
 
@@ -186,11 +245,11 @@ class DetectMarkersThread:
         mprint(f"    |--- image read with size [{img_array.shape}] ")
 
         # actual detection process
-        detections = yolo.get_detection(img_array)
+        detections = self.yolo.get_detection(img_array)
         self.progress_dialog.update_sub_progress(50)
 
         # remove too large detections
-        filtered_detections = yolo.filter_results(detections, self.params['max_residual'])
+        filtered_detections = self.yolo.filter_results(detections, self.params['max_residual'])
         filtered_detection_num = len(filtered_detections)
         mprint(f"    |--- filtered out {filtered_detection_num} of total {len(detections)} detections mets maximum residual {self.params['max_residual']} pixels")
         for detection in filtered_detections:
@@ -199,13 +258,13 @@ class DetectMarkersThread:
 
         # using stag-python to detect markers
         for i, detection in enumerate(detections):
-            cropped_imarray, x0, y0 = yolo.crop_image(img_array, detection.bbox.to_xyxy())
+            cropped_imarray, x0, y0 = self.yolo.crop_image(img_array, detection.bbox.to_xyxy())
 
             bbox_offset = np.asarray([x0, y0])
 
             marker_id, \
             marker_center_in_bbox, \
-            marker_corner_in_bbox = yolo.stag_detect_id_in_bbox(
+            marker_corner_in_bbox = self.yolo.stag_detect_id_in_bbox(
                 cropped_imarray, 
                 self.params['code_bit']
             )
@@ -216,7 +275,7 @@ class DetectMarkersThread:
 
                 marker_label = f"StagHD{self.params['code_bit']}-{marker_id}"
 
-                self.place_marker_on_photo(self.chunk, camera, marker_label, marker_center)
+                self.place_marker_on_photo(chunk, camera, marker_label, marker_center)
 
 
     def place_marker_on_photo(self, chunk, camera, marker_label, marker_center):

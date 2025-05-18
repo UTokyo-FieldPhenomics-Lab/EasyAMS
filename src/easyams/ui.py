@@ -5,10 +5,10 @@ from . import img_loader, stag_gcp
 
 def add_metashape_menu():
     # img loader function
-    Metashape.app.addMenuItem("EasyAMS/batchImport/Import Images", img_loader.create_batch_image_loader)
+    Metashape.app.addMenuItem("EasyAMS/Batch Import/Import RGB Images", img_loader.create_batch_image_loader)
 
     # stag_gcp function
-    Metashape.app.addMenuItem("EasyAMS/StagMarkers/Detect Markers", stag_gcp.detect_stag_markers)
+    Metashape.app.addMenuItem("EasyAMS/Stag Markers/Detect Markers", stag_gcp.detect_stag_markers)
     # Metashape.app.addMenuItem("EasyAMS/StagMarkers/Print Markers", installer.print_paths)
 
     # -----------------------
@@ -86,9 +86,9 @@ def show_about_dialog():
 
 
 class ProgressDialog(QtWidgets.QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, window_title=""):
         super().__init__(parent)
-        self.setWindowTitle("Detecting Stag Markers")
+        self.setWindowTitle(window_title)
         self.resize(500, 120)
         self.setModal(True)  # 设置为模态对话框
 
@@ -122,3 +122,10 @@ class ProgressDialog(QtWidgets.QDialog):
     def update_sub_progress(self, value):
         self.sub_progress_bar.setValue(value)
         Metashape.app.update()
+
+    def update_window_title_progress(self, window_title):
+        self.setWindowTitle(window_title)
+        Metashape.app.update()
+
+    def reject(self):
+        super().reject()  # 调用父类的 reject 方法关闭对话框
