@@ -20,6 +20,11 @@ def add_metashape_menu():
     Metashape.app.addMenuItem("EasyAMS/Check for Updates", updator.check_updates_ui)
     Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
 
+    # check for updates
+    ver, has_updates = updator.check_updates()
+    if has_updates:
+        Metashape.app.messageBox("EasyAMS Update available, please check for updates in the menu.")
+
 def show_about_dialog():
     
     # 创建主对话框
