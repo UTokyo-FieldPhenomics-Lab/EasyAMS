@@ -6,8 +6,6 @@ from PySide2.QtWidgets import (QWidget, QApplication, QVBoxLayout, QHBoxLayout, 
 from PySide2.QtCore import Qt
 import Metashape
 
-from .utils import ConfigManager
-
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -63,14 +61,14 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         self.img_ext = ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
 
         from . import system_info
-        self.config_manager = ConfigManager(system_info.config_file)
+        self.config_manager = system_info.config_manager
     
     def select_folder(self):
-        last_path = self.config_manager.load_last_batch_import_path()
+        last_path = self.config_manager.load('last_batch_import_folder')
         folder = QFileDialog.getExistingDirectory(self, "Select Root Image Folder", dir=last_path)
 
         if folder:
-            self.config_manager.save_last_batch_import_path(folder)
+            self.config_manager.save('last_batch_import_folder', folder)
 
             self.root_path = folder
             self.folder_path.setText(folder)

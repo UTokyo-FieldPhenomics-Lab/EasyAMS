@@ -1,4 +1,4 @@
-__version__ = "0.1.1"
+__version__ = "0.0.3"
 
 import os
 import sys
@@ -10,6 +10,9 @@ import subprocess
 import tempfile
 import tarfile
 import zipfile
+
+# config manager
+import json
 
 from typing import Dict, Optional, Tuple
 
@@ -147,6 +150,10 @@ class Installer:
         # install status checker
         self.venv_is_ready = False
         self.package_is_ready = False
+        self.is_dev = False
+
+        self.config_file = os.path.join(self.easyams_plugin_folder, "config.json")
+        self.config_manager = ConfigManager(self.config_file)
 
     def get_metashape_scripts_path(self):
 
@@ -173,12 +180,15 @@ class Installer:
         mprint(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
         mprint(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
 
+    def in_dev_mode(self):
+        self.is_dev = True
+        self.config_manager.save("is_dev", self.is_dev)
         
-    def is_uv_installed(self) -> str:
+    def is_uv_installed(self) -> bool:
         """
         Returns
         -------
-        str
+        bool
             The commend to execute uv
         """
 
@@ -265,12 +275,12 @@ class Installer:
                 f"does not match with metashape python version {self.metashape_python_version}")
             return self.venv_is_ready
         
-    def install_easyams_dependencies(self, dev=False):
+    def install_easyams_dependencies(self):
         mprint(f'[EasyAMS][Func] Installing dependencies...')
 
         if self.venv_is_ready or self.venv_ready():
 
-            if dev:
+            if self.is_dev:
                 cmd = [
                     self.easyams_uv,
                     "pip",
@@ -367,7 +377,7 @@ class Installer:
             raise
 
 
-    def main(self, dev=False):
+    def main(self):
         mprint("[EasyAMS] Initializing the plugin...")
 
         if not self.is_uv_installed():
@@ -379,7 +389,7 @@ class Installer:
 
         if self.venv_is_ready or self.venv_ready():
 
-            self.install_easyams_dependencies(dev)
+            self.install_easyams_dependencies()
 
             self.add_venv_to_path()
 
@@ -571,6 +581,30 @@ class UvInstaller:
             except OSError as cleanup_error:
                 print(f"Warning: Failed to clean up directory: {cleanup_error}", file=sys.stderr)
             return False
+
+class ConfigManager:
+
+    def __init__(self, config_file):
+
+        self.config_file = config_file
+    
+    def save(self, key, value):
+        """保存最后选择的路径到配置文件"""
+        config = {}
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+        config[key] = value
+        with open(self.config_file, 'w') as f:
+            json.dump(config, f)
+    
+    def load(self, key):
+        """从配置文件加载最后选择的路径"""
+        if os.path.exists(self.config_file):
+            with open(self.config_file, 'r') as f:
+                config = json.load(f)
+                return config.get(key, '')
+        return ''
         
 
 if __name__ == "__main__":
@@ -581,11 +615,13 @@ if __name__ == "__main__":
         try:
             if sys.argv[1] in dev_option:
                 is_dev = True
+                installer.in_dev_mode()
+                mprint(f"Set to develop mode")
             else:
                 is_dev = False
-            mprint(f"Set to develop mode")
         except ValueError:
             mprint(f"Input developer mode value [{sys.argv[1]}] should in {dev_option}")
+
 
     if path_equal(installer.easyams_installer_folder, installer.metashape_user_script_folder):
         # the installer is installed correctly (inside the metashape script launcher folder)
@@ -596,5 +632,5 @@ if __name__ == "__main__":
         ams.ui.add_metashape_menu()
 
     else:
-        installer.main(is_dev)
+        installer.main()
         installer.print_paths()

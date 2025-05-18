@@ -1,7 +1,7 @@
 from PySide2 import QtWidgets, QtGui, QtCore
 import Metashape
 
-from . import img_loader, stag_gcp
+from . import img_loader, stag_gcp, updator
 
 def add_metashape_menu():
     # img loader function
@@ -15,7 +15,7 @@ def add_metashape_menu():
     Metashape.app.addMenuSeparator("EasyAMS")
 
     # about easyams
-    # Metashape.app.addMenuItem("EasyAMS/Check for Updates", installer.print_paths)
+    Metashape.app.addMenuItem("EasyAMS/Check for Updates", updator.check_updates_ui)
     Metashape.app.addMenuItem("EasyAMS/About EasyAMS", show_about_dialog)
 
 def show_about_dialog():

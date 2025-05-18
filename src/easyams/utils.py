@@ -5,6 +5,8 @@ import json
 import platform
 import hashlib
 import requests
+import shutil
+import subprocess
 import Metashape
 
 from typing import Dict, Optional, Tuple
@@ -12,6 +14,37 @@ from typing import Dict, Optional, Tuple
 def mprint(*values, **kwargs):
     print(*values, **kwargs)
     Metashape.app.update()
+
+def execude_command(cmd, workdir=None):
+    mprint(f"[CMD] {' '.join(cmd)}")
+
+    try:
+        # 使用 Popen 执行命令
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', cwd=workdir)
+
+        # 实时读取标准输出
+        for line in process.stdout:
+            mprint(">>> ", line.strip())  # 打印每一行输出
+
+        # 等待命令执行完成
+        process.wait()
+
+        # 检查是否有标准错误输出
+        if process.returncode != 0:
+            mprint("[Error]:")
+            for line in process.stderr:
+                mprint("   ", line.strip())
+                Metashape.app.update()
+
+            return False
+        else:
+            return True
+
+    except Exception as e:
+        mprint(f"[Error] when executing the following command:\n"
+               f"    {cmd}\n"
+               f"    {e}")
+        return False
 
 class SystemInfo:
 
@@ -33,9 +66,17 @@ class SystemInfo:
                 f"../easyams-packages-py{sys.version_info.major}{sys.version_info.minor}"))
         
         self.easyams_venv_folder = os.path.join(self.easyams_plugin_folder, ".venv")
+        self.easyams_bin_folder = os.path.join(self.easyams_plugin_folder, "bin")
 
         self.easyams_model_folder = os.path.join(self.easyams_plugin_folder, "models")
         os.makedirs(self.easyams_model_folder, exist_ok=True)
+
+        if shutil.which("uv") is not None:
+            # uv is detected on this PC
+            self.easyams_uv = "uv"
+        else:
+            # here assume that uv is installed in the easyams_bin_folder by installer.
+            self.easyams_uv = os.path.join(self.easyams_bin_folder, "uv.exe" if self.system == "Windows" else "uv")
 
         self.onnx = GitReleaseDownloader(
             repo="UTokyo-FieldPhenomics-Lab/EasyAMS",  # 替换为实际的 GitHub 仓库路径
@@ -46,6 +87,7 @@ class SystemInfo:
         )
 
         self.config_file = os.path.join(self.easyams_plugin_folder, "config.json")
+        self.config_manager = ConfigManager(self.config_file)
 
     def get_metashape_scripts_path(self):
 
@@ -69,22 +111,22 @@ class ConfigManager:
 
         self.config_file = config_file
     
-    def save_last_batch_import_path(self, path):
+    def save(self, key, value):
         """保存最后选择的路径到配置文件"""
         config = {}
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r') as f:
                 config = json.load(f)
-        config['last_batch_import_folder'] = path
+        config[key] = value
         with open(self.config_file, 'w') as f:
             json.dump(config, f)
     
-    def load_last_batch_import_path(self):
+    def load(self, key):
         """从配置文件加载最后选择的路径"""
         if os.path.exists(self.config_file):
             with open(self.config_file, 'r') as f:
                 config = json.load(f)
-                return config.get('last_batch_import_folder', '')
+                return config.get(key, '')
         return ''
     
 

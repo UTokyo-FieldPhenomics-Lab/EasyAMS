@@ -6,7 +6,9 @@ from PySide2.QtWidgets import (
     QApplication, QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
 )
 
-from .utils import mprint
+from .utils import mprint, execude_command
+
+installer_github_url = 'https://raw.githubusercontent.com/UTokyo-FieldPhenomics-Lab/EasyAMS/refs/heads/main/tools/installer.py'
 
 
 def check_updates():
@@ -100,11 +102,54 @@ class UpdateDialog(QDialog):
         self.show()
 
     def accept(self):
+        if self.installer_need_update:
+            self.update_installer()
+
+        if self.package_need_update:
+            self.update_package()
 
         super().accept()
 
     def reject(self):
         super().reject()
+
+    def update_installer():
+        local_installer_file = os.path.join(system_info.metashape_user_script_folder, 'easyams_launcher.py')
+
+        response = requests.get(installer_github_url)
+        if response.status_code == 200:
+            with open(local_installer_file, 'w') as f:
+                f.write(response.text)
+            mprint("Installer updated successfully.")
+            return True
+        else:
+            mprint(f"Failed to download installer. Status code: {response.status_code}")
+            return False
+
+    def update_package():
+        from . import system_info
+        self.config_manager = system_info.config_manager
+
+        is_dev = self.config_manager.get('is_dev')
+        if is_dev:
+            Metashape.app.messageBox("Can not update editable package when installed in dev mode, please use git to update your source code folder")
+            return False
+        else:
+            cmd = [
+                system_info.easyams_uv,
+                "pip",
+                "install",
+                "-U",
+                "easyams"
+            ]
+
+            is_okay = execude_command(cmd, workdir=self.easyams_venv_folder)
+            if is_okay:
+                mprint("[EasyAMS] Packages updated successfully via uv.")
+                return True
+            else:
+                mprint("[EasyAMS] Failed update dependencies via uv.")
+                return False
 
 
 def get_installer_local_version():
@@ -135,7 +180,7 @@ def get_installer_local_version():
 
 def get_installer_git_version():
     try:
-        response = requests.get('https://raw.githubusercontent.com/UTokyo-FieldPhenomics-Lab/EasyAMS/refs/heads/main/tools/installer.py')
+        response = requests.get( installer_github_url )
         response.raise_for_status()
 
         # Find the line containing __version__

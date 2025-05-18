@@ -62,7 +62,6 @@ class StagDetector(QtWidgets.QDialog):
         # Checkbox list for chunks
         self.chunk_list_widget = QtWidgets.QListWidget()
         self.chunk_list_widget.setSelectionMode(QtWidgets.QAbstractItemView.MultiSelection)
-        self.chunk_list_widget.setFixedHeight(180)
         layout.addWidget(self.chunk_list_widget)
 
         # Populate chunk list
