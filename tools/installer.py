@@ -385,7 +385,7 @@ class Installer:
 
             self.copy_installer_to_launch_folder()
 
-            Metashape.messageBox("EasyAMS plugin installed successfully, please restart Metashape to take effects")
+            Metashape.app.messageBox("EasyAMS plugin installed successfully, please restart Metashape to take effects")
 
 
 class UvInstaller:
