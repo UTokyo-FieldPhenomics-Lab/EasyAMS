@@ -34,14 +34,14 @@ class StagDetector(QtWidgets.QDialog):
         self.create_ui()
 
     def init_onnx_file(self):
-        # 检查是否需要更新
-        is_outdated, local_version, github_version = self.system_info.onnx.outdated(return_versions=True)
-        
-        if is_outdated:
-            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is outdated, the latested Github release version v{github_version} is available.")
-            self.system_info.onnx.update()
-        else:
-            print(f"[EasyAMS] Local YOLO.onnx file version v{local_version} is up-to-date.")
+
+        if not os.path.exists(self.system_info.onnx.file_path):
+            success = self.system_info.onnx.update()
+
+            if not success:
+                Metashape.app.messageBox("Failed to download ONNX file. Please try again later.")
+
+                self.reject()
 
 
     def create_ui(self):

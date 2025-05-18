@@ -258,7 +258,9 @@ class GitReleaseDownloader:
 
         response = requests.get(url, headers=self.headers)
         if response.status_code != 200:
-            raise Exception(f"Failed to fetch releases: {response.status_code}, {response.text}")
+            mprint(f"Failed to fetch releases: {response.status_code}, {response.text}")
+            return False
+
         releases = response.json()
 
         for release in releases[:self.MAX_RELEASE_CHECKS]:
@@ -266,7 +268,8 @@ class GitReleaseDownloader:
             if version is not None:
                 return self._download_and_verify(version, download_url, sha256_url)
         
-        raise Exception(f"No matching file found in the last {self.MAX_RELEASE_CHECKS} releases for pattern: {self.file_name}_v?.{self.suffix}")
+        mprint(f"No matching file found in the last {self.MAX_RELEASE_CHECKS} releases for pattern: {self.file_name}_v?.{self.suffix}")
+        return False
 
     def _download_and_verify(self, version: int, download_url: str, sha256_url: Optional[str]) -> int:
         """
@@ -281,7 +284,8 @@ class GitReleaseDownloader:
         print(f"Downloading {download_url} to {local_file_path} ...")
         with requests.get(download_url, headers=self.headers, stream=True) as r:
             if r.status_code != 200:
-                raise Exception(f"Failed to download file: {r.status_code}, {r.text}")
+                mprint(f"Failed to download file: {r.status_code}, {r.text}")
+                return False
             with open(local_file_path, "wb") as f:
                 for chunk in r.iter_content(chunk_size=8192):
                     f.write(chunk)
@@ -292,14 +296,15 @@ class GitReleaseDownloader:
             sha256_hash = self._download_sha256(sha256_url)
             if not self._verify_file_sha256(local_file_path, sha256_hash):
                 os.remove(local_file_path)  # 删除下载的无效文件
-                raise Exception("SHA256 verification failed. The downloaded file is corrupted or tampered.")
+                mprint("SHA256 verification failed. The downloaded file is corrupted or tampered.")
+                return False
         else:
             print("Warning: No SHA256 checksum file found, skipping verification")
         
         # 删除旧文件
         self._delete_old_files(version)
         print(f"[EasyAMS] Update complete. Version: v{version}")
-        return version
+        return True
 
     def _download_sha256(self, sha256_url: str) -> str:
         """
