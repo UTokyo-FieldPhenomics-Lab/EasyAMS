@@ -1,7 +1,9 @@
+import importlib.resources
+
 from PySide2 import QtWidgets, QtGui, QtCore
 import Metashape
 
-from . import img_loader, stag_gcp, updator
+from . import img_loader, stag_gcp, updator, resources
 
 def add_metashape_menu():
     # img loader function
@@ -23,10 +25,10 @@ def show_about_dialog():
     # 创建主对话框
     dialog = QtWidgets.QDialog()
     dialog.setWindowTitle("About EasyAMS")
-    dialog.resize(400, 300)  # width, height
+    # dialog.resize(400, 300)  # width, height
     # dialog.setSizeGripEnabled(True)  # 启用右下角的调整大小控件
     dialog.setMinimumSize(400, 300)  # 可选：设置最小大小
-    dialog.setWindowIcon(QtGui.QIcon("/path/to/icon.png"))  # 替换为你的图标路径
+    # dialog.setWindowIcon(QtGui.QIcon("/path/to/icon.png"))  # 替换为你的图标路径
 
     # 创建主布局
     layout = QtWidgets.QVBoxLayout(dialog)
@@ -34,7 +36,10 @@ def show_about_dialog():
     # 添加顶部图标和标题
     top_layout = QtWidgets.QHBoxLayout()
     icon_label = QtWidgets.QLabel()
-    icon_label.setPixmap(QtGui.QPixmap(r"C:\OneDrive\Documents\4_PhD\10_PPT\template\UTokyoLab.resource\Picture1.png").scaled(128, 128, QtCore.Qt.KeepAspectRatio))  # 替换为你的 logo 路径
+    # 使用 importlib.resources 读取资源
+    with importlib.resources.path(resources, "lab_logo.png") as icon_path:
+        pixmap = QtGui.QPixmap(str(icon_path))
+    icon_label.setPixmap(pixmap.scaled(128, 128, QtCore.Qt.KeepAspectRatio))
     top_layout.addWidget(icon_label)
 
     from . import __version__
@@ -49,6 +54,7 @@ def show_about_dialog():
     title_layout.addWidget(version_label)
     title_layout.addWidget(description_label)
     top_layout.addLayout(title_layout)
+    top_layout.addStretch()
 
     layout.addLayout(top_layout)
 
