@@ -1,10 +1,11 @@
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 import os
 import sys
 import platform
 import shutil
 import subprocess
+from packaging.version import Version
 
 # uv installer dependencies
 import tempfile
@@ -120,6 +121,8 @@ def download_file(url: str, dest_path: str) -> None:
 class Installer:
 
     def __init__(self):
+
+        self.check_campatibility()
         
         self.system = platform.system()
 
@@ -172,7 +175,16 @@ class Installer:
         return script_path
     
     def check_campatibility(self):
-        self.metashape_major_version = ".".join(Metashape.app.version.split('.')[:2])
+        if Version(Metashape.app.version) < Version("2.1.0"):
+            Metashape.app.messageBox("[EasyAMS] Your version of Metashape is may outdated. Please update to the version over 2.1.0 to ensure the best performance.")
+
+    def is_blank_metashape_project(self):
+        doc = Metashape.app.document
+        if len(doc.chunks) != 1 or doc.chunk.label != "Chunk 1" or len(doc.chunk.cameras) != 0:
+            Metashape.app.messageBox("[EasyAMS] This is not a blank Metashape project. Please save your current work and create a new blank project before running the script.")
+            return False
+        else:
+            return True
     
     def print_paths(self):
         mprint(f"[EasyAMS] Platform: {self.system}")
@@ -378,6 +390,9 @@ class Installer:
 
 
     def main(self):
+        if not self.is_blank_metashape_project():
+            return
+
         mprint("[EasyAMS] Initializing the plugin...")
 
         if not self.is_uv_installed():
@@ -395,7 +410,10 @@ class Installer:
 
             self.copy_installer_to_launch_folder()
 
-            Metashape.app.messageBox("EasyAMS plugin installed successfully, please restart Metashape to take effects")
+            self.print_paths()
+
+            Metashape.app.messageBox("EasyAMS plugin installed successfully, restart Metashape to take effects")
+            Metashape.app.quit()
 
 
 class UvInstaller:
@@ -633,4 +651,3 @@ if __name__ == "__main__":
 
     else:
         installer.main()
-        installer.print_paths()
