@@ -45,6 +45,14 @@ dependencies = [
 ]
 
 [dependency-groups]
+jupyter = [
+    "ipykernel>=6.29.5",
+    "matplotlib>=3.9.4",
+    "pandas>=2.2.3",
+    "scikit-image>=0.24.0",
+    "scikit-learn>=1.6.1",
+    "segment-anything>=1.0",
+]
 tests = [
     "pyside2>=5.15.2.1",
     "pytest>=8.3.5",
