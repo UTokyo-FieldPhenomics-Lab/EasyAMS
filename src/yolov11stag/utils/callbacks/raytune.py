@@ -1,6 +1,6 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.utils import SETTINGS
+from yolov11stag.utils import SETTINGS
 
 try:
     assert SETTINGS["raytune"] is True  # verify integration is enabled

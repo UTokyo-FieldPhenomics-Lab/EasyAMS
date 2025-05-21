@@ -9,9 +9,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from ultralytics.data.utils import exif_size, img2label_paths
-from ultralytics.utils import TQDM
-from ultralytics.utils.checks import check_requirements
+from yolov11stag.data.utils import exif_size, img2label_paths
+from yolov11stag.utils import TQDM
+from yolov11stag.utils.checks import check_requirements
 
 
 def bbox_iof(polygon1, bbox2, eps=1e-6):

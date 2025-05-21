@@ -1,8 +1,8 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.engine.predictor import BasePredictor
-from ultralytics.engine.results import Results
-from ultralytics.utils import ops
+from yolov11stag.engine.predictor import BasePredictor
+from yolov11stag.engine.results import Results
+from yolov11stag.utils import ops
 
 
 class DetectionPredictor(BasePredictor):
@@ -23,8 +23,8 @@ class DetectionPredictor(BasePredictor):
         construct_result: Create a single Result object from a prediction.
 
     Examples:
-        >>> from ultralytics.utils import ASSETS
-        >>> from ultralytics.models.yolo.detect import DetectionPredictor
+        >>> from yolov11stag.utils import ASSETS
+        >>> from yolov11stag.models.yolo.detect import DetectionPredictor
         >>> args = dict(model="yolo11n.pt", source=ASSETS)
         >>> predictor = DetectionPredictor(overrides=args)
         >>> predictor.predict_cli()

@@ -6,12 +6,12 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ultralytics.data import build_dataloader, build_yolo_dataset, converter
-from ultralytics.engine.validator import BaseValidator
-from ultralytics.utils import LOGGER, ops
-from ultralytics.utils.checks import check_requirements
-from ultralytics.utils.metrics import ConfusionMatrix, DetMetrics, box_iou
-from ultralytics.utils.plotting import output_to_target, plot_images
+from yolov11stag.data import build_dataloader, build_yolo_dataset, converter
+from yolov11stag.engine.validator import BaseValidator
+from yolov11stag.utils import LOGGER, ops
+from yolov11stag.utils.checks import check_requirements
+from yolov11stag.utils.metrics import ConfusionMatrix, DetMetrics, box_iou
+from yolov11stag.utils.plotting import output_to_target, plot_images
 
 
 class DetectionValidator(BaseValidator):
@@ -35,7 +35,7 @@ class DetectionValidator(BaseValidator):
         stats (dict): Dictionary for storing statistics during validation.
 
     Examples:
-        >>> from ultralytics.models.yolo.detect import DetectionValidator
+        >>> from yolov11stag.models.yolo.detect import DetectionValidator
         >>> args = dict(model="yolo11n.pt", data="coco8.yaml")
         >>> validator = DetectionValidator(args=args)
         >>> validator()
@@ -364,7 +364,7 @@ class DetectionValidator(BaseValidator):
             shape (tuple): Shape of the original image.
             file (Path): File path to save the detections.
         """
-        from ultralytics.engine.results import Results
+        from yolov11stag.engine.results import Results
 
         Results(
             np.zeros((shape[0], shape[1]), dtype=np.uint8),

@@ -14,8 +14,8 @@ import cv2
 import numpy as np
 from PIL import Image, ImageOps
 
-from ultralytics.nn.autobackend import check_class_names
-from ultralytics.utils import (
+from yolov11stag.nn.autobackend import check_class_names
+from yolov11stag.utils import (
     DATASETS_DIR,
     LOGGER,
     MACOS,
@@ -29,9 +29,9 @@ from ultralytics.utils import (
     emojis,
     is_dir_writeable,
 )
-from ultralytics.utils.checks import check_file, check_font, is_ascii
-from ultralytics.utils.downloads import download, safe_download, unzip_file
-from ultralytics.utils.ops import segments2boxes
+from yolov11stag.utils.checks import check_file, check_font, is_ascii
+from yolov11stag.utils.downloads import download, safe_download, unzip_file
+from yolov11stag.utils.ops import segments2boxes
 
 HELP_URL = "See https://docs.ultralytics.com/datasets for dataset formatting guidance."
 IMG_FORMATS = {"bmp", "dng", "jpeg", "jpg", "mpo", "png", "tif", "tiff", "webp", "pfm", "heic"}  # image suffixes
@@ -267,7 +267,7 @@ def visualize_image_annotations(image_path, txt_path, label_map):
     """
     import matplotlib.pyplot as plt
 
-    from ultralytics.utils.plotting import colors
+    from yolov11stag.utils.plotting import colors
 
     img = np.array(Image.open(image_path))
     img_height, img_width = img.shape[:2]
@@ -513,7 +513,7 @@ def check_cls_dataset(dataset, split=""):
         LOGGER.warning(f"Dataset 'split=train' not found at {train_set}")
         image_files = list(data_dir.rglob("*.jpg")) + list(data_dir.rglob("*.png"))
         if image_files:
-            from ultralytics.data.split import split_classify_dataset
+            from yolov11stag.data.split import split_classify_dataset
 
             LOGGER.info(f"Found {len(image_files)} images in subdirectories. Attempting to split...")
             data_dir = split_classify_dataset(data_dir, train_ratio=0.8)
@@ -575,7 +575,7 @@ class HUBDatasetStats:
         i.e. https://github.com/ultralytics/hub/raw/main/example_datasets/coco8.zip for coco8.zip.
 
     Examples:
-        >>> from ultralytics.data.utils import HUBDatasetStats
+        >>> from yolov11stag.data.utils import HUBDatasetStats
         >>> stats = HUBDatasetStats("path/to/coco8.zip", task="detect")  # detect dataset
         >>> stats = HUBDatasetStats("path/to/coco8-seg.zip", task="segment")  # segment dataset
         >>> stats = HUBDatasetStats("path/to/coco8-pose.zip", task="pose")  # pose dataset
@@ -671,7 +671,7 @@ class HUBDatasetStats:
                     "labels": [{Path(k).name: v} for k, v in dataset.imgs],
                 }
             else:
-                from ultralytics.data import YOLODataset
+                from yolov11stag.data import YOLODataset
 
                 dataset = YOLODataset(img_path=self.data[split], data=self.data, task=self.task)
                 x = np.array(
@@ -703,7 +703,7 @@ class HUBDatasetStats:
 
     def process_images(self):
         """Compress images for Ultralytics HUB."""
-        from ultralytics.data import YOLODataset  # ClassificationDataset
+        from yolov11stag.data import YOLODataset  # ClassificationDataset
 
         self.im_dir.mkdir(parents=True, exist_ok=True)  # makes dataset-hub/images/
         for split in "train", "val", "test":
@@ -731,7 +731,7 @@ def compress_one_image(f, f_new=None, max_dim=1920, quality=50):
 
     Examples:
         >>> from pathlib import Path
-        >>> from ultralytics.data.utils import compress_one_image
+        >>> from yolov11stag.data.utils import compress_one_image
         >>> for f in Path("path/to/dataset").rglob("*.jpg"):
         >>>    compress_one_image(f)
     """

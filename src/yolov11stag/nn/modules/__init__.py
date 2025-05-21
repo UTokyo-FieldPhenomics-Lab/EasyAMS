@@ -7,7 +7,7 @@ attention mechanisms, transformer components, and detection/segmentation heads.
 
 Examples:
     Visualize a module with Netron.
-    >>> from ultralytics.nn.modules import *
+    >>> from yolov11stag.nn.modules import *
     >>> import torch
     >>> import os
     >>> x = torch.ones(1, 128, 40, 40)

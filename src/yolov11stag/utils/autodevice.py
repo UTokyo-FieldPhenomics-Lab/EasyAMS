@@ -1,7 +1,7 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.utils import LOGGER
-from ultralytics.utils.checks import check_requirements
+from yolov11stag.utils import LOGGER
+from yolov11stag.utils.checks import check_requirements
 
 
 class GPUInfo:

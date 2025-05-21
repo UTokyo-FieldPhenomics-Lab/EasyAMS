@@ -7,8 +7,8 @@ from typing import Any, List, Optional
 import cv2
 import numpy as np
 
-from ultralytics.utils import LOGGER, RANK, SETTINGS, TESTS_RUNNING, ops
-from ultralytics.utils.metrics import ClassifyMetrics, DetMetrics, OBBMetrics, PoseMetrics, SegmentMetrics
+from yolov11stag.utils import LOGGER, RANK, SETTINGS, TESTS_RUNNING, ops
+from yolov11stag.utils.metrics import ClassifyMetrics, DetMetrics, OBBMetrics, PoseMetrics, SegmentMetrics
 
 try:
     assert not TESTS_RUNNING  # do not log pytest
@@ -411,7 +411,7 @@ def _log_plots(experiment, trainer) -> None:
             directory information.
 
     Examples:
-        >>> from ultralytics.utils.callbacks.comet import _log_plots
+        >>> from yolov11stag.utils.callbacks.comet import _log_plots
         >>> _log_plots(experiment, trainer)
     """
     plot_filenames = None
@@ -502,7 +502,7 @@ def on_fit_epoch_end(trainer) -> None:
     experiment.log_metrics(trainer.metrics, step=curr_step, epoch=curr_epoch)
     experiment.log_metrics(trainer.lr, step=curr_step, epoch=curr_epoch)
     if curr_epoch == 1:
-        from ultralytics.utils.torch_utils import model_info_for_loggers
+        from yolov11stag.utils.torch_utils import model_info_for_loggers
 
         experiment.log_metrics(model_info_for_loggers(trainer), step=curr_step, epoch=curr_epoch)
 

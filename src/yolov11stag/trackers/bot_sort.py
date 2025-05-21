@@ -5,8 +5,8 @@ from collections import deque
 import numpy as np
 import torch
 
-from ultralytics.utils.ops import xywh2xyxy
-from ultralytics.utils.plotting import save_one_box
+from yolov11stag.utils.ops import xywh2xyxy
+from yolov11stag.utils.plotting import save_one_box
 
 from .basetrack import TrackState
 from .byte_tracker import BYTETracker, STrack
@@ -247,7 +247,7 @@ class ReID:
 
     def __init__(self, model):
         """Initialize encoder for re-identification."""
-        from ultralytics import YOLO
+        from yolov11stag import YOLO
 
         self.model = YOLO(model)
         self.model(embed=[len(self.model.model.model) - 2 if ".pt" in model else -1], verbose=False)  # initialize

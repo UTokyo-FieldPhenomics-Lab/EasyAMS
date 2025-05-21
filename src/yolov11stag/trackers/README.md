@@ -42,7 +42,7 @@ To run the tracker on video streams, use a trained Detect, Segment, or Pose mode
 
 ```python
 # Python
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Load an official or custom model
 model = YOLO("yolo11n.pt")  # Load an official Detect model
@@ -77,7 +77,7 @@ Tracking configuration shares properties with the Predict mode, such as `conf` (
 
 ```python
 # Python
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Configure the tracking parameters and run the tracker
 model = YOLO("yolo11n.pt")
@@ -96,7 +96,7 @@ Ultralytics allows you to use a modified tracker configuration file. Create a co
 
 ```python
 # Python
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Load the model and run the tracker with a custom configuration file
 model = YOLO("yolo11n.pt")
@@ -121,7 +121,7 @@ This Python script uses [OpenCV (`cv2`)](https://opencv.org/) and Ultralytics YO
 # Python
 import cv2
 
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Load the YOLO11 model
 model = YOLO("yolo11n.pt")
@@ -172,7 +172,7 @@ from collections import defaultdict
 import cv2
 import numpy as np
 
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Load the YOLO11 model
 model = YOLO("yolo11n.pt")
@@ -250,7 +250,7 @@ import threading
 
 import cv2
 
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 
 def run_tracker_in_thread(filename, model, file_index):

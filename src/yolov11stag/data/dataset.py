@@ -12,10 +12,10 @@ import torch
 from PIL import Image
 from torch.utils.data import ConcatDataset
 
-from ultralytics.utils import LOCAL_RANK, LOGGER, NUM_THREADS, TQDM, colorstr
-from ultralytics.utils.instance import Instances
-from ultralytics.utils.ops import resample_segments, segments2boxes
-from ultralytics.utils.torch_utils import TORCHVISION_0_18
+from yolov11stag.utils import LOCAL_RANK, LOGGER, NUM_THREADS, TQDM, colorstr
+from yolov11stag.utils.instance import Instances
+from yolov11stag.utils.ops import resample_segments, segments2boxes
+from yolov11stag.utils.torch_utils import TORCHVISION_0_18
 
 from .augment import (
     Compose,

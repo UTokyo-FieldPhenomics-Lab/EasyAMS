@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Optional, Union
 
-from ultralytics import SAM, YOLO
+from yolov11stag import SAM, YOLO
 
 
 def auto_annotate(
@@ -37,7 +37,7 @@ def auto_annotate(
         output_dir (str | Path | None): Directory to save the annotated results. If None, a default directory is created.
 
     Examples:
-        >>> from ultralytics.data.annotator import auto_annotate
+        >>> from yolov11stag.data.annotator import auto_annotate
         >>> auto_annotate(data="ultralytics/assets", det_model="yolo11n.pt", sam_model="mobile_sam.pt")
     """
     det_model = YOLO(det_model)

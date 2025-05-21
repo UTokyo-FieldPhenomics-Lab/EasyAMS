@@ -12,10 +12,10 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ultralytics.data.augment import LetterBox
-from ultralytics.utils import LOGGER, DataExportMixin, SimpleClass, ops
-from ultralytics.utils.plotting import Annotator, colors, save_one_box
-from ultralytics.utils.torch_utils import smart_inference_mode
+from yolov11stag.data.augment import LetterBox
+from yolov11stag.utils import LOGGER, DataExportMixin, SimpleClass, ops
+from yolov11stag.utils.plotting import Annotator, colors, save_one_box
+from yolov11stag.utils.torch_utils import smart_inference_mode
 
 
 class BaseTensor(SimpleClass):
@@ -121,7 +121,7 @@ class BaseTensor(SimpleClass):
 
         Examples:
             >>> import torch
-            >>> from ultralytics.engine.results import BaseTensor
+            >>> from yolov11stag.engine.results import BaseTensor
             >>> data = torch.tensor([[1, 2, 3], [4, 5, 6]])
             >>> base_tensor = BaseTensor(data, orig_shape=(720, 1280))
             >>> gpu_tensor = base_tensor.cuda()
@@ -682,7 +682,7 @@ class Results(SimpleClass, DataExportMixin):
             (str): Path to the saved text file.
 
         Examples:
-            >>> from ultralytics import YOLO
+            >>> from yolov11stag import YOLO
             >>> model = YOLO("yolo11n.pt")
             >>> results = model("path/to/image.jpg")
             >>> for result in results:
@@ -1083,7 +1083,7 @@ class Masks(BaseTensor):
 
         Examples:
             >>> import torch
-            >>> from ultralytics.engine.results import Masks
+            >>> from yolov11stag.engine.results import Masks
             >>> masks = torch.rand(10, 160, 160)  # 10 masks of 160x160 resolution
             >>> orig_shape = (720, 1280)  # Original image shape
             >>> mask_obj = Masks(masks, orig_shape)
@@ -1167,7 +1167,7 @@ class Keypoints(BaseTensor):
 
     Examples:
         >>> import torch
-        >>> from ultralytics.engine.results import Keypoints
+        >>> from yolov11stag.engine.results import Keypoints
         >>> keypoints_data = torch.rand(1, 17, 3)  # 1 detection, 17 keypoints, (x, y, conf)
         >>> orig_shape = (480, 640)  # Original image shape (height, width)
         >>> keypoints = Keypoints(keypoints_data, orig_shape)
@@ -1610,7 +1610,7 @@ class OBB(BaseTensor):
 
         Examples:
             >>> import torch
-            >>> from ultralytics import YOLO
+            >>> from yolov11stag import YOLO
             >>> model = YOLO("yolo11n-obb.pt")
             >>> results = model("path/to/image.jpg")
             >>> for result in results:

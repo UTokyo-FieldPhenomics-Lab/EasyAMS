@@ -6,8 +6,8 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from ultralytics.utils import checks
-from ultralytics.utils.torch_utils import smart_inference_mode
+from yolov11stag.utils import checks
+from yolov11stag.utils.torch_utils import smart_inference_mode
 
 try:
     import clip
@@ -59,7 +59,7 @@ class CLIP(TextModel):
         encode_text: Encode tokenized texts into normalized feature vectors.
 
     Examples:
-        >>> from ultralytics.models.sam import CLIP
+        >>> from yolov11stag.models.sam import CLIP
         >>> import torch
         >>> device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         >>> clip_model = CLIP(size="ViT-B/32", device=device)
@@ -81,7 +81,7 @@ class CLIP(TextModel):
 
         Examples:
             >>> import torch
-            >>> from ultralytics.models.sam.modules.clip import CLIP
+            >>> from yolov11stag.models.sam.modules.clip import CLIP
             >>> clip_model = CLIP("ViT-B/32", device=torch.device("cuda:0"))
             >>> text_features = clip_model.encode_text(["a photo of a cat", "a photo of a dog"])
         """
@@ -172,7 +172,7 @@ class MobileCLIP(TextModel):
             device (torch.device): Device to load the model on.
 
         Examples:
-            >>> from ultralytics.nn.modules import MobileCLIP
+            >>> from yolov11stag.nn.modules import MobileCLIP
             >>> import torch
             >>> model = MobileCLIP("s0", device=torch.device("cpu"))
             >>> tokens = model.tokenize(["a photo of a cat", "a photo of a dog"])
@@ -194,7 +194,7 @@ class MobileCLIP(TextModel):
         config = self.config_size_map[size]
         file = f"mobileclip_{size}.pt"
         if not Path(file).is_file():
-            from ultralytics import download
+            from yolov11stag import download
 
             download(f"https://docs-assets.developer.apple.com/ml-research/datasets/mobileclip/{file}")
         self.model = mobileclip.create_model_and_transforms(f"mobileclip_{config}", pretrained=file, device=device)[0]
@@ -276,14 +276,14 @@ class MobileCLIPTS(TextModel):
             device (torch.device): Device to load the model on.
 
         Examples:
-            >>> from ultralytics.nn.modules import MobileCLIP
+            >>> from yolov11stag.nn.modules import MobileCLIP
             >>> import torch
             >>> model = MobileCLIP(device=torch.device("cpu"))
             >>> tokens = model.tokenize(["a photo of a cat", "a photo of a dog"])
             >>> features = model.encode_text(tokens)
         """
         super().__init__()
-        from ultralytics.utils.downloads import attempt_download_asset
+        from yolov11stag.utils.downloads import attempt_download_asset
 
         self.encoder = torch.jit.load(attempt_download_asset("mobileclip_blt.ts"), map_location=device)
         self.tokenizer = clip.clip.tokenize

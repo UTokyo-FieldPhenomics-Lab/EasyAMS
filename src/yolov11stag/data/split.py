@@ -4,8 +4,8 @@ import random
 import shutil
 from pathlib import Path
 
-from ultralytics.data.utils import IMG_FORMATS, img2label_paths
-from ultralytics.utils import DATASETS_DIR, LOGGER, TQDM
+from yolov11stag.data.utils import IMG_FORMATS, img2label_paths
+from yolov11stag.utils import DATASETS_DIR, LOGGER, TQDM
 
 
 def split_classify_dataset(source_dir, train_ratio=0.8):
@@ -100,7 +100,7 @@ def autosplit(path=DATASETS_DIR / "coco8/images", weights=(0.9, 0.1, 0.0), annot
         annotated_only (bool, optional): If True, only images with an associated txt file are used.
 
     Examples:
-        >>> from ultralytics.data.split import autosplit
+        >>> from yolov11stag.data.split import autosplit
         >>> autosplit()
     """
     path = Path(path)  # images dir

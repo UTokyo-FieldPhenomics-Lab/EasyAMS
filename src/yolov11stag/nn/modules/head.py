@@ -9,8 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.init import constant_, xavier_uniform_
 
-from ultralytics.utils.tal import TORCH_1_10, dist2bbox, dist2rbox, make_anchors
-from ultralytics.utils.torch_utils import fuse_conv_and_bn, smart_inference_mode
+from yolov11stag.utils.tal import TORCH_1_10, dist2bbox, dist2rbox, make_anchors
+from yolov11stag.utils.torch_utils import fuse_conv_and_bn, smart_inference_mode
 
 from .block import DFL, SAVPE, BNContrastiveHead, ContrastiveHead, Proto, Residual, SwiGLUFFN
 from .conv import Conv, DWConv
@@ -671,7 +671,7 @@ class RTDETRDecoder(nn.Module):
             (tuple | torch.Tensor): During training, returns a tuple of bounding boxes, scores, and other metadata.
                 During inference, returns a tensor of shape (bs, 300, 4+nc) containing bounding boxes and class scores.
         """
-        from ultralytics.models.utils.ops import get_cdn_group
+        from yolov11stag.models.utils.ops import get_cdn_group
 
         # Input projection and embedding
         feats, shapes = self._get_encoder_input(x)

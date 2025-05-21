@@ -25,7 +25,7 @@ Requirements:
     $ pip install "ultralytics[export]"
 
 Python:
-    from ultralytics import YOLO
+    from yolov11stag import YOLO
     model = YOLO('yolo11n.pt')
     results = model.export(format='onnx')
 
@@ -70,15 +70,15 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ultralytics import __version__
-from ultralytics.cfg import TASK2DATA, get_cfg
-from ultralytics.data import build_dataloader
-from ultralytics.data.dataset import YOLODataset
-from ultralytics.data.utils import check_cls_dataset, check_det_dataset
-from ultralytics.nn.autobackend import check_class_names, default_class_names
-from ultralytics.nn.modules import C2f, Classify, Detect, RTDETRDecoder
-from ultralytics.nn.tasks import ClassificationModel, DetectionModel, SegmentationModel, WorldModel
-from ultralytics.utils import (
+from yolov11stag import __version__
+from yolov11stag.cfg import TASK2DATA, get_cfg
+from yolov11stag.data import build_dataloader
+from yolov11stag.data.dataset import YOLODataset
+from yolov11stag.data.utils import check_cls_dataset, check_det_dataset
+from yolov11stag.nn.autobackend import check_class_names, default_class_names
+from yolov11stag.nn.modules import C2f, Classify, Detect, RTDETRDecoder
+from yolov11stag.nn.tasks import ClassificationModel, DetectionModel, SegmentationModel, WorldModel
+from yolov11stag.utils import (
     ARM64,
     DEFAULT_CFG,
     IS_COLAB,
@@ -96,18 +96,18 @@ from ultralytics.utils import (
     colorstr,
     get_default_args,
 )
-from ultralytics.utils.checks import (
+from yolov11stag.utils.checks import (
     check_imgsz,
     check_is_path_safe,
     check_requirements,
     check_version,
     is_sudo_available,
 )
-from ultralytics.utils.downloads import attempt_download_asset, get_github_assets, safe_download
-from ultralytics.utils.export import export_engine, export_onnx
-from ultralytics.utils.files import file_size, spaces_in_path
-from ultralytics.utils.ops import Profile, nms_rotated
-from ultralytics.utils.torch_utils import TORCH_1_13, get_cpu_info, get_latest_opset, select_device
+from yolov11stag.utils.downloads import attempt_download_asset, get_github_assets, safe_download
+from yolov11stag.utils.export import export_engine, export_onnx
+from yolov11stag.utils.files import file_size, spaces_in_path
+from yolov11stag.utils.ops import Profile, nms_rotated
+from yolov11stag.utils.torch_utils import TORCH_1_13, get_cpu_info, get_latest_opset, select_device
 
 
 def export_formats():
@@ -377,7 +377,7 @@ class Exporter:
         model = model.fuse()
 
         if imx:
-            from ultralytics.utils.torch_utils import FXModel
+            from yolov11stag.utils.torch_utils import FXModel
 
             model = FXModel(model)
         for m in model.modules():
@@ -393,7 +393,7 @@ class Exporter:
                 # EdgeTPU does not support FlexSplitV while split provides cleaner ONNX graph
                 m.forward = m.forward_split
             if isinstance(m, Detect) and imx:
-                from ultralytics.utils.tal import make_anchors
+                from yolov11stag.utils.tal import make_anchors
 
                 m.anchors, m.strides = (
                     x.transpose(0, 1)

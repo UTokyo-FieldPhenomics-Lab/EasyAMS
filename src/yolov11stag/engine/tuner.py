@@ -9,7 +9,7 @@ where small changes in hyperparameters can lead to significant differences in mo
 
 Examples:
     Tune hyperparameters for YOLO11n on COCO8 at imgsz=640 and epochs=30 for 300 tuning iterations.
-    >>> from ultralytics import YOLO
+    >>> from yolov11stag import YOLO
     >>> model = YOLO("yolo11n.pt")
     >>> model.tune(data="coco8.yaml", epochs=10, iterations=300, optimizer="AdamW", plots=False, save=False, val=False)
 """
@@ -22,9 +22,9 @@ import time
 import numpy as np
 import torch
 
-from ultralytics.cfg import get_cfg, get_save_dir
-from ultralytics.utils import DEFAULT_CFG, LOGGER, YAML, callbacks, colorstr, remove_colorstr
-from ultralytics.utils.plotting import plot_tune_results
+from yolov11stag.cfg import get_cfg, get_save_dir
+from yolov11stag.utils import DEFAULT_CFG, LOGGER, YAML, callbacks, colorstr, remove_colorstr
+from yolov11stag.utils.plotting import plot_tune_results
 
 
 class Tuner:
@@ -48,7 +48,7 @@ class Tuner:
 
     Examples:
         Tune hyperparameters for YOLO11n on COCO8 at imgsz=640 and epochs=30 for 300 tuning iterations.
-        >>> from ultralytics import YOLO
+        >>> from yolov11stag import YOLO
         >>> model = YOLO("yolo11n.pt")
         >>> model.tune(
         ...     data="coco8.yaml", epochs=10, iterations=300, optimizer="AdamW", plots=False, save=False, val=False

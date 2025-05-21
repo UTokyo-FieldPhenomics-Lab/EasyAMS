@@ -10,7 +10,7 @@ from urllib import parse, request
 
 import torch
 
-from ultralytics.utils import LOGGER, TQDM, checks, clean_url, emojis, is_online, url2file
+from yolov11stag.utils import LOGGER, TQDM, checks, clean_url, emojis, is_online, url2file
 
 # Define Ultralytics GitHub assets maintained at https://github.com/ultralytics/assets
 GITHUB_ASSETS_REPO = "ultralytics/assets"
@@ -78,7 +78,7 @@ def delete_dsstore(path, files_to_delete=(".DS_Store", "__MACOSX")):
         files_to_delete (tuple): The files to be deleted.
 
     Examples:
-        >>> from ultralytics.utils.downloads import delete_dsstore
+        >>> from yolov11stag.utils.downloads import delete_dsstore
         >>> delete_dsstore("path/to/dir")
 
     Notes:
@@ -107,7 +107,7 @@ def zip_directory(directory, compress=True, exclude=(".DS_Store", "__MACOSX"), p
         (Path): The path to the resulting zip file.
 
     Examples:
-        >>> from ultralytics.utils.downloads import zip_directory
+        >>> from yolov11stag.utils.downloads import zip_directory
         >>> file = zip_directory("path/to/dir")
     """
     from zipfile import ZIP_DEFLATED, ZIP_STORED, ZipFile
@@ -150,7 +150,7 @@ def unzip_file(file, path=None, exclude=(".DS_Store", "__MACOSX"), exist_ok=Fals
         (Path): The path to the directory where the zipfile was extracted.
 
     Examples:
-        >>> from ultralytics.utils.downloads import unzip_file
+        >>> from yolov11stag.utils.downloads import unzip_file
         >>> directory = unzip_file("path/to/file.zip")
     """
     from zipfile import BadZipFile, ZipFile, is_zipfile
@@ -243,7 +243,7 @@ def get_google_drive_file_info(link):
         (str): Original filename of the Google Drive file. If filename extraction fails, returns None.
 
     Examples:
-        >>> from ultralytics.utils.downloads import get_google_drive_file_info
+        >>> from yolov11stag.utils.downloads import get_google_drive_file_info
         >>> link = "https://drive.google.com/file/d/1cqT-cJgANNrhIHCrEufUYhQ4RqiWG_lJ/view?usp=drive_link"
         >>> url, filename = get_google_drive_file_info(link)
     """
@@ -305,7 +305,7 @@ def safe_download(
         (Path | str): The path to the downloaded file or extracted directory.
 
     Examples:
-        >>> from ultralytics.utils.downloads import safe_download
+        >>> from yolov11stag.utils.downloads import safe_download
         >>> link = "https://ultralytics.com/assets/bus.jpg"
         >>> path = safe_download(link)
     """
@@ -424,7 +424,7 @@ def attempt_download_asset(file, repo="ultralytics/assets", release="v8.3.0", **
     Examples:
         >>> file_path = attempt_download_asset("yolo11n.pt", repo="ultralytics/assets", release="latest")
     """
-    from ultralytics.utils import SETTINGS  # scoped for circular import
+    from yolov11stag.utils import SETTINGS  # scoped for circular import
 
     # YOLOv3/5u updates
     file = str(file)

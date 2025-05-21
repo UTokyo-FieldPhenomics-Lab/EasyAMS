@@ -193,12 +193,12 @@ def update_models(model_names=("yolo11n.pt",), source_dir=Path("."), update_name
 
     Examples:
         Update specified YOLO models and save them in 'updated_models' subdirectory:
-        >>> from ultralytics.utils.files import update_models
+        >>> from yolov11stag.utils.files import update_models
         >>> model_names = ("yolo11n.pt", "yolov8s.pt")
         >>> update_models(model_names, source_dir=Path("/models"), update_names=True)
     """
-    from ultralytics import YOLO
-    from ultralytics.nn.autobackend import default_class_names
+    from yolov11stag import YOLO
+    from yolov11stag.nn.autobackend import default_class_names
 
     target_dir = source_dir / "updated_models"
     target_dir.mkdir(parents=True, exist_ok=True)  # Ensure target directory exists

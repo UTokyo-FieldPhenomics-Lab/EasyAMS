@@ -7,8 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Union
 
-from ultralytics import __version__
-from ultralytics.utils import (
+from yolov11stag import __version__
+from yolov11stag.utils import (
     ASSETS,
     DEFAULT_CFG,
     DEFAULT_CFG_DICT,
@@ -286,7 +286,7 @@ def get_cfg(cfg: Union[str, Path, Dict, SimpleNamespace] = DEFAULT_CFG_DICT, ove
         (SimpleNamespace): Namespace containing the merged configuration arguments.
 
     Examples:
-        >>> from ultralytics.cfg import get_cfg
+        >>> from yolov11stag.cfg import get_cfg
         >>> config = get_cfg()  # Load default configuration
         >>> config_with_overrides = get_cfg("path/to/config.yaml", overrides={"epochs": 50, "batch_size": 16})
 
@@ -406,7 +406,7 @@ def get_save_dir(args: SimpleNamespace, name: str = None) -> Path:
     if getattr(args, "save_dir", None):
         save_dir = args.save_dir
     else:
-        from ultralytics.utils.files import increment_path
+        from yolov11stag.utils.files import increment_path
 
         project = args.project or (ROOT.parent / "tests/tmp/runs" if TESTS_RUNNING else RUNS_DIR) / args.task
         name = name or args.name or f"{args.mode}"
@@ -574,7 +574,7 @@ def handle_yolo_hub(args: List[str]) -> None:
         - For the 'login' command, if no API key is provided, an empty string is passed to the login function.
         - The 'logout' command does not require any additional arguments.
     """
-    from ultralytics import hub
+    from yolov11stag import hub
 
     if args[0] == "login":
         key = args[1] if len(args) > 1 else ""
@@ -657,7 +657,7 @@ def handle_yolo_solutions(args: List[str]) -> None:
         - The inference solution will be launched using the 'streamlit run' command.
         - The Streamlit app file is located in the Ultralytics package directory.
     """
-    from ultralytics.solutions.config import SolutionConfig
+    from yolov11stag.solutions.config import SolutionConfig
 
     full_args_dict = vars(SolutionConfig())  # arguments dictionary
     overrides = {}
@@ -707,7 +707,7 @@ def handle_yolo_solutions(args: List[str]) -> None:
     else:
         import cv2  # Only needed for cap and vw functionality
 
-        from ultralytics import solutions
+        from yolov11stag import solutions
 
         solution = getattr(solutions, SOLUTION_MAP[solution_name])(is_cli=True, **overrides)  # class i.e ObjectCounter
 
@@ -935,19 +935,19 @@ def entrypoint(debug: str = "") -> None:
     overrides["model"] = model
     stem = Path(model).stem.lower()
     if "rtdetr" in stem:  # guess architecture
-        from ultralytics import RTDETR
+        from yolov11stag import RTDETR
 
         model = RTDETR(model)  # no task argument
     elif "fastsam" in stem:
-        from ultralytics import FastSAM
+        from yolov11stag import FastSAM
 
         model = FastSAM(model)
     elif "sam_" in stem or "sam2_" in stem or "sam2.1_" in stem:
-        from ultralytics import SAM
+        from yolov11stag import SAM
 
         model = SAM(model)
     else:
-        from ultralytics import YOLO
+        from yolov11stag import YOLO
 
         model = YOLO(model, task=task)
     if isinstance(overrides.get("pretrained"), str):

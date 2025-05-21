@@ -10,8 +10,8 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 
-from ultralytics.nn.autobackend import check_class_names
-from ultralytics.nn.modules import (
+from yolov11stag.nn.autobackend import check_class_names
+from yolov11stag.nn.modules import (
     AIFI,
     C1,
     C2,
@@ -69,9 +69,9 @@ from ultralytics.nn.modules import (
     YOLOESegment,
     v10Detect,
 )
-from ultralytics.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
-from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
-from ultralytics.utils.loss import (
+from yolov11stag.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, YAML, colorstr, emojis
+from yolov11stag.utils.checks import check_requirements, check_suffix, check_yaml
+from yolov11stag.utils.loss import (
     E2EDetectLoss,
     v8ClassificationLoss,
     v8DetectionLoss,
@@ -79,9 +79,9 @@ from ultralytics.utils.loss import (
     v8PoseLoss,
     v8SegmentationLoss,
 )
-from ultralytics.utils.ops import make_divisible
-from ultralytics.utils.plotting import feature_visualization
-from ultralytics.utils.torch_utils import (
+from yolov11stag.utils.ops import make_divisible
+from yolov11stag.utils.plotting import feature_visualization
+from yolov11stag.utils.torch_utils import (
     fuse_conv_and_bn,
     fuse_deconv_and_bn,
     initialize_weights,
@@ -614,7 +614,7 @@ class RTDETRDetectionModel(DetectionModel):
 
     def init_criterion(self):
         """Initialize the loss criterion for the RTDETRDetectionModel."""
-        from ultralytics.models.utils.loss import RTDETRDetectionLoss
+        from yolov11stag.models.utils.loss import RTDETRDetectionLoss
 
         return RTDETRDetectionLoss(nc=self.nc, use_vfl=True)
 
@@ -741,7 +741,7 @@ class WorldModel(DetectionModel):
         Returns:
             (torch.Tensor): Text positional embeddings.
         """
-        from ultralytics.nn.text_model import build_text_model
+        from yolov11stag.nn.text_model import build_text_model
 
         device = next(self.model.parameters()).device
         if not getattr(self, "clip_model", None) and cache_clip_model:
@@ -843,7 +843,7 @@ class YOLOEModel(DetectionModel):
         Returns:
             (torch.Tensor): Text positional embeddings.
         """
-        from ultralytics.nn.text_model import build_text_model
+        from yolov11stag.nn.text_model import build_text_model
 
         device = next(self.model.parameters()).device
         if not getattr(self, "clip_model", None) and cache_clip_model:
@@ -1029,7 +1029,7 @@ class YOLOEModel(DetectionModel):
             preds (torch.Tensor | List[torch.Tensor], optional): Predictions.
         """
         if not hasattr(self, "criterion"):
-            from ultralytics.utils.loss import TVPDetectLoss
+            from yolov11stag.utils.loss import TVPDetectLoss
 
             visual_prompt = batch.get("visuals", None) is not None  # TODO
             self.criterion = TVPDetectLoss(self) if visual_prompt else self.init_criterion()
@@ -1063,7 +1063,7 @@ class YOLOESegModel(YOLOEModel, SegmentationModel):
             preds (torch.Tensor | List[torch.Tensor], optional): Predictions.
         """
         if not hasattr(self, "criterion"):
-            from ultralytics.utils.loss import TVPSegmentLoss
+            from yolov11stag.utils.loss import TVPSegmentLoss
 
             visual_prompt = batch.get("visuals", None) is not None  # TODO
             self.criterion = TVPSegmentLoss(self) if visual_prompt else self.init_criterion()
@@ -1208,10 +1208,10 @@ def torch_safe_load(weight, safe_only=False):
         file (str): The loaded filename.
 
     Examples:
-        >>> from ultralytics.nn.tasks import torch_safe_load
+        >>> from yolov11stag.nn.tasks import torch_safe_load
         >>> ckpt, file = torch_safe_load("path/to/best.pt", safe_only=True)
     """
-    from ultralytics.utils.downloads import attempt_download_asset
+    from yolov11stag.utils.downloads import attempt_download_asset
 
     check_suffix(file=weight, suffix=".pt")
     file = attempt_download_asset(weight)  # search online if missing locally

@@ -205,7 +205,7 @@ def add_integration_callbacks(instance):
             The type of instance determines which callbacks are loaded.
 
     Examples:
-        >>> from ultralytics.engine.trainer import BaseTrainer
+        >>> from yolov11stag.engine.trainer import BaseTrainer
         >>> trainer = BaseTrainer()
         >>> add_integration_callbacks(trainer)
     """

@@ -20,7 +20,7 @@ yolo task=detect mode=train model=yolo11n.yaml data=coco8.yaml epochs=100 imgsz=
 These files are [Python](https://www.python.org/)-compatible, accepting the same [configuration arguments](https://docs.ultralytics.com/usage/cfg/) as shown in the CLI example:
 
 ```python
-from ultralytics import YOLO
+from yolov11stag import YOLO
 
 # Initialize a YOLO11n model from a YAML configuration file
 # This creates a model architecture without loading pre-trained weights

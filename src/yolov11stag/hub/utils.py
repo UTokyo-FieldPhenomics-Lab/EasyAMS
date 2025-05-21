@@ -8,8 +8,8 @@ from pathlib import Path
 
 import requests
 
-from ultralytics import __version__
-from ultralytics.utils import (
+from yolov11stag import __version__
+from yolov11stag.utils import (
     ARGV,
     ENVIRONMENT,
     IS_COLAB,
@@ -26,8 +26,8 @@ from ultralytics.utils import (
     colorstr,
     get_git_origin_url,
 )
-from ultralytics.utils.downloads import GITHUB_ASSETS_NAMES
-from ultralytics.utils.torch_utils import get_cpu_info
+from yolov11stag.utils.downloads import GITHUB_ASSETS_NAMES
+from yolov11stag.utils.torch_utils import get_cpu_info
 
 HUB_API_ROOT = os.environ.get("ULTRALYTICS_HUB_API", "https://api.ultralytics.com")
 HUB_WEB_ROOT = os.environ.get("ULTRALYTICS_HUB_WEB", "https://hub.ultralytics.com")

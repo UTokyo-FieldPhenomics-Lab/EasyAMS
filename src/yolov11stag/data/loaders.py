@@ -14,10 +14,10 @@ import numpy as np
 import torch
 from PIL import Image
 
-from ultralytics.data.utils import FORMATS_HELP_MSG, IMG_FORMATS, VID_FORMATS
-from ultralytics.utils import IS_COLAB, IS_KAGGLE, LOGGER, ops
-from ultralytics.utils.checks import check_requirements
-from ultralytics.utils.patches import imread
+from yolov11stag.data.utils import FORMATS_HELP_MSG, IMG_FORMATS, VID_FORMATS
+from yolov11stag.utils import IS_COLAB, IS_KAGGLE, LOGGER, ops
+from yolov11stag.utils.checks import check_requirements
+from yolov11stag.utils.patches import imread
 
 
 @dataclass

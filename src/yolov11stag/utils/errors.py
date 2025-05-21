@@ -1,6 +1,6 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.utils import emojis
+from yolov11stag.utils import emojis
 
 
 class HUBModelError(Exception):

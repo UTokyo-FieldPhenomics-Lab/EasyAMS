@@ -21,11 +21,11 @@ import torch
 from torch import distributed as dist
 from torch import nn, optim
 
-from ultralytics import __version__
-from ultralytics.cfg import get_cfg, get_save_dir
-from ultralytics.data.utils import check_cls_dataset, check_det_dataset
-from ultralytics.nn.tasks import attempt_load_one_weight, attempt_load_weights
-from ultralytics.utils import (
+from yolov11stag import __version__
+from yolov11stag.cfg import get_cfg, get_save_dir
+from yolov11stag.data.utils import check_cls_dataset, check_det_dataset
+from yolov11stag.nn.tasks import attempt_load_one_weight, attempt_load_weights
+from yolov11stag.utils import (
     DEFAULT_CFG,
     LOCAL_RANK,
     LOGGER,
@@ -37,11 +37,11 @@ from ultralytics.utils import (
     colorstr,
     emojis,
 )
-from ultralytics.utils.autobatch import check_train_batch_size
-from ultralytics.utils.checks import check_amp, check_file, check_imgsz, check_model_file_from_stem, print_args
-from ultralytics.utils.dist import ddp_cleanup, generate_ddp_command
-from ultralytics.utils.files import get_latest_run
-from ultralytics.utils.torch_utils import (
+from yolov11stag.utils.autobatch import check_train_batch_size
+from yolov11stag.utils.checks import check_amp, check_file, check_imgsz, check_model_file_from_stem, print_args
+from yolov11stag.utils.dist import ddp_cleanup, generate_ddp_command
+from yolov11stag.utils.files import get_latest_run
+from yolov11stag.utils.torch_utils import (
     TORCH_2_4,
     EarlyStopping,
     ModelEMA,

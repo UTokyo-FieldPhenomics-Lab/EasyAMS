@@ -7,13 +7,13 @@ from copy import copy
 import numpy as np
 import torch.nn as nn
 
-from ultralytics.data import build_dataloader, build_yolo_dataset
-from ultralytics.engine.trainer import BaseTrainer
-from ultralytics.models import yolo
-from ultralytics.nn.tasks import DetectionModel
-from ultralytics.utils import LOGGER, RANK
-from ultralytics.utils.plotting import plot_images, plot_labels, plot_results
-from ultralytics.utils.torch_utils import de_parallel, torch_distributed_zero_first
+from yolov11stag.data import build_dataloader, build_yolo_dataset
+from yolov11stag.engine.trainer import BaseTrainer
+from yolov11stag.models import yolo
+from yolov11stag.nn.tasks import DetectionModel
+from yolov11stag.utils import LOGGER, RANK
+from yolov11stag.utils.plotting import plot_images, plot_labels, plot_results
+from yolov11stag.utils.torch_utils import de_parallel, torch_distributed_zero_first
 
 
 class DetectionTrainer(BaseTrainer):
@@ -43,7 +43,7 @@ class DetectionTrainer(BaseTrainer):
         auto_batch: Calculate optimal batch size based on model memory requirements.
 
     Examples:
-        >>> from ultralytics.models.yolo.detect import DetectionTrainer
+        >>> from yolov11stag.models.yolo.detect import DetectionTrainer
         >>> args = dict(model="yolo11n.pt", data="coco8.yaml", epochs=3)
         >>> trainer = DetectionTrainer(overrides=args)
         >>> trainer.train()

@@ -1,6 +1,6 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.utils import LOGGER, SETTINGS, TESTS_RUNNING
+from yolov11stag.utils import LOGGER, SETTINGS, TESTS_RUNNING
 
 try:
     assert not TESTS_RUNNING  # do not log pytest
@@ -97,7 +97,7 @@ def on_train_epoch_end(trainer) -> None:
 def on_fit_epoch_end(trainer) -> None:
     """Callback function called at end of each fit (train+val) epoch."""
     if run and trainer.epoch == 0:
-        from ultralytics.utils.torch_utils import model_info_for_loggers
+        from yolov11stag.utils.torch_utils import model_info_for_loggers
 
         run["Configuration/Model"] = model_info_for_loggers(trainer)
     _log_scalars(trainer.metrics, trainer.epoch + 1)

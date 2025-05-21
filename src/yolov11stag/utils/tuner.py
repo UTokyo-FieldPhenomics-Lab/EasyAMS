@@ -1,7 +1,7 @@
 # Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
-from ultralytics.cfg import TASK2DATA, TASK2METRIC, get_cfg, get_save_dir
-from ultralytics.utils import DEFAULT_CFG, DEFAULT_CFG_DICT, LOGGER, NUM_THREADS, checks, colorstr
+from yolov11stag.cfg import TASK2DATA, TASK2METRIC, get_cfg, get_save_dir
+from yolov11stag.utils import DEFAULT_CFG, DEFAULT_CFG_DICT, LOGGER, NUM_THREADS, checks, colorstr
 
 
 def run_ray_tune(
@@ -27,7 +27,7 @@ def run_ray_tune(
         (dict): A dictionary containing the results of the hyperparameter search.
 
     Examples:
-        >>> from ultralytics import YOLO
+        >>> from yolov11stag import YOLO
         >>> model = YOLO("yolo11n.pt")  # Load a YOLO11n model
 
         Start tuning hyperparameters for YOLO11n training on the COCO8 dataset

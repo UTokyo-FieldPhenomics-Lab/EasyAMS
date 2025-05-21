@@ -24,8 +24,8 @@ import numpy as np
 import torch
 import tqdm
 
-from ultralytics import __version__
-from ultralytics.utils.patches import imread, imshow, imwrite, torch_load, torch_save  # for patches
+from yolov11stag import __version__
+from yolov11stag.utils.patches import imread, imshow, imwrite, torch_load, torch_save  # for patches
 
 # PyTorch Multi-GPU DDP Constants
 RANK = int(os.getenv("RANK", -1))
@@ -73,7 +73,7 @@ HELP_MSG = """
 
     2. Use the Python SDK:
 
-        from ultralytics import YOLO
+        from yolov11stag import YOLO
 
         # Load a model
         model = YOLO("yolo11n.yaml")  # build a new model from scratch
@@ -151,7 +151,7 @@ class TQDM(rich.tqdm if TQDM_RICH else tqdm.tqdm):
         __init__: Initializes the TQDM object with custom settings.
 
     Examples:
-        >>> from ultralytics.utils import TQDM
+        >>> from yolov11stag.utils import TQDM
         >>> for i in TQDM(range(100)):
         ...     # Your processing code here
         ...     pass
@@ -172,7 +172,7 @@ class TQDM(rich.tqdm if TQDM_RICH else tqdm.tqdm):
             - The default bar format is set to TQDM_BAR_FORMAT unless overridden in kwargs.
 
         Examples:
-            >>> from ultralytics.utils import TQDM
+            >>> from yolov11stag.utils import TQDM
             >>> for i in TQDM(range(100)):
             ...     # Your code here
             ...     pass
@@ -255,7 +255,7 @@ class DataExportMixin:
         Note:
             Requires `lxml` package to be installed.
         """
-        from ultralytics.utils.checks import check_requirements
+        from yolov11stag.utils.checks import check_requirements
 
         check_requirements("lxml")
         df = self.to_df(normalize=normalize, decimals=decimals)
@@ -602,7 +602,7 @@ class ThreadingLocked:
         lock (threading.Lock): A lock object used to manage access to the decorated function.
 
     Examples:
-        >>> from ultralytics.utils import ThreadingLocked
+        >>> from yolov11stag.utils import ThreadingLocked
         >>> @ThreadingLocked()
         >>> def my_function():
         ...    # Your code here
@@ -1440,7 +1440,7 @@ class SettingsManager(JSONDict):
         import hashlib
         import uuid
 
-        from ultralytics.utils.torch_utils import torch_distributed_zero_first
+        from yolov11stag.utils.torch_utils import torch_distributed_zero_first
 
         root = GIT_DIR or Path()
         datasets_root = (root.parent if GIT_DIR and is_dir_writeable(root.parent) else root).resolve()

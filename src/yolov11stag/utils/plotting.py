@@ -11,9 +11,9 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from PIL import __version__ as pil_version
 
-from ultralytics.utils import IS_COLAB, IS_KAGGLE, LOGGER, TryExcept, ops, plt_settings, threaded
-from ultralytics.utils.checks import check_font, check_version, is_ascii
-from ultralytics.utils.files import increment_path
+from yolov11stag.utils import IS_COLAB, IS_KAGGLE, LOGGER, TryExcept, ops, plt_settings, threaded
+from yolov11stag.utils.checks import check_font, check_version, is_ascii
+from yolov11stag.utils.files import increment_path
 
 
 class Colors:
@@ -29,7 +29,7 @@ class Colors:
         pose_palette (np.ndarray): A specific color palette array for pose estimation with dtype np.uint8.
 
     Examples:
-        >>> from ultralytics.utils.plotting import Colors
+        >>> from yolov11stag.utils.plotting import Colors
         >>> colors = Colors()
         >>> colors(5, True)  # ff6fdd or (255, 111, 221)
 
@@ -170,7 +170,7 @@ class Annotator:
         light_colors (set): Set of colors considered light for text contrast.
 
     Examples:
-        >>> from ultralytics.utils.plotting import Annotator
+        >>> from yolov11stag.utils.plotting import Annotator
         >>> im0 = cv2.imread("test.png")
         >>> annotator = Annotator(im0, line_width=10)
     """
@@ -266,7 +266,7 @@ class Annotator:
             (tuple): Text color for label.
 
         Examples:
-            >>> from ultralytics.utils.plotting import Annotator
+            >>> from yolov11stag.utils.plotting import Annotator
             >>> im0 = cv2.imread("test.png")
             >>> annotator = Annotator(im0, line_width=10)
             >>> annotator.get_txt_color(color=(104, 31, 17))  # return (255, 255, 255)
@@ -290,7 +290,7 @@ class Annotator:
             rotated (bool, optional): Whether the task is oriented bounding box detection.
 
         Examples:
-            >>> from ultralytics.utils.plotting import Annotator
+            >>> from yolov11stag.utils.plotting import Annotator
             >>> im0 = cv2.imread("test.png")
             >>> annotator = Annotator(im0, line_width=10)
             >>> annotator.box_label(box=[10, 20, 30, 40], label="person")
@@ -511,7 +511,7 @@ class Annotator:
             area (float): Area enclosed by the bounding box.
 
         Examples:
-            >>> from ultralytics.utils.plotting import Annotator
+            >>> from yolov11stag.utils.plotting import Annotator
             >>> im0 = cv2.imread("test.png")
             >>> annotator = Annotator(im0, line_width=10)
             >>> annotator.get_bbox_dimension(bbox=[10, 20, 30, 40])
@@ -616,7 +616,7 @@ def save_one_box(xyxy, im, file=Path("im.jpg"), gain=1.02, pad=10, square=False,
         (np.ndarray): The cropped image.
 
     Examples:
-        >>> from ultralytics.utils.plotting import save_one_box
+        >>> from yolov11stag.utils.plotting import save_one_box
         >>> xyxy = [50, 50, 150, 150]
         >>> im = cv2.imread("image.jpg")
         >>> cropped_im = save_one_box(xyxy, im, file="cropped.jpg", square=True)
@@ -824,7 +824,7 @@ def plot_results(file="path/to/results.csv", dir="", segment=False, pose=False, 
         on_plot (callable, optional): Callback function to be executed after plotting. Takes filename as an argument.
 
     Examples:
-        >>> from ultralytics.utils.plotting import plot_results
+        >>> from yolov11stag.utils.plotting import plot_results
         >>> plot_results("path/to/results.csv", segment=True)
     """
     import matplotlib.pyplot as plt  # scope for faster 'import ultralytics'

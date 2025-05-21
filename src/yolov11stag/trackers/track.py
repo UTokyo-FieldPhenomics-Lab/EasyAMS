@@ -5,8 +5,8 @@ from pathlib import Path
 
 import torch
 
-from ultralytics.utils import YAML, IterableSimpleNamespace
-from ultralytics.utils.checks import check_yaml
+from yolov11stag.utils import YAML, IterableSimpleNamespace
+from yolov11stag.utils.checks import check_yaml
 
 from .bot_sort import BOTSORT
 from .byte_tracker import BYTETracker
@@ -48,7 +48,7 @@ def on_predict_start(predictor: object, persist: bool = False) -> None:
     if hasattr(predictor, "_hook"):
         predictor._hook.remove()
     if cfg.tracker_type == "botsort" and cfg.with_reid and cfg.model == "auto":
-        from ultralytics.nn.modules.head import Detect
+        from yolov11stag.nn.modules.head import Detect
 
         if not (
             isinstance(predictor.model.model, torch.nn.Module)

@@ -10,8 +10,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from ultralytics.utils import LOGGER
-from ultralytics.utils.metrics import batch_probiou
+from yolov11stag.utils import LOGGER
+from yolov11stag.utils.metrics import batch_probiou
 
 
 class Profile(contextlib.ContextDecorator):
@@ -24,7 +24,7 @@ class Profile(contextlib.ContextDecorator):
         cuda (bool): Whether CUDA is being used.
 
     Examples:
-        >>> from ultralytics.utils.ops import Profile
+        >>> from yolov11stag.utils.ops import Profile
         >>> with Profile(device=device) as dt:
         ...     pass  # slow operation here
         >>> print(dt)  # prints "Elapsed time is 9.5367431640625e-07 s"
@@ -832,7 +832,7 @@ def masks2segments(masks, strategy="all"):
     Returns:
         (list): List of segment masks.
     """
-    from ultralytics.data.converter import merge_multi_segment
+    from yolov11stag.data.converter import merge_multi_segment
 
     segments = []
     for x in masks.int().cpu().numpy().astype("uint8"):
