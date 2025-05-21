@@ -60,6 +60,8 @@ tests = [
 ]
 train = [
     "labelme>=5.8.1",
+    "onnxruntime-gpu==1.19.2",
+    "onnxslim>=0.1.53",
     "opencv-python-headless==4.10.0.84",
     "torch==2.5.1",
     "torchvision==0.20.1",
