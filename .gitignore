@@ -1,6 +1,7 @@
 # gitignore in this project
 *.pt
 uv.lock
+src/yolov11stag.temp
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
