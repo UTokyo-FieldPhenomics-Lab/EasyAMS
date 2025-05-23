@@ -144,7 +144,9 @@ class StagDetector(QtWidgets.QDialog):
             self.chunk_list_widget.setDisabled(True)
         elif mode == "Active chunk":
             self._set_all_options_checked(False)
-            self.chunk_list_widget.item(self.doc.chunk.key).setCheckState(QtCore.Qt.Checked)  # Example: select first chunk
+            chunk_keys = [c.key for c in self.doc.chunks]
+            idx = chunk_keys.index(self.doc.chunk.key) if self.doc.chunk.key in chunk_keys else -1
+            self.chunk_list_widget.item(idx).setCheckState(QtCore.Qt.Checked)  # Example: select first chunk
             self.chunk_list_widget.setDisabled(True)
         else:
             self.chunk_list_widget.setDisabled(False)
