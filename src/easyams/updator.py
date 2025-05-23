@@ -206,7 +206,7 @@ def get_installer_local_version():
         mprint(f"[Error] Local installer file {local_installer_file} does not exist.")
         return None
 
-    with open(local_installer_file, 'r') as f:
+    with open(local_installer_file, 'r', encoding="utf-8") as f:
         lines = f.readlines()
 
         # Find the line containing __version__
