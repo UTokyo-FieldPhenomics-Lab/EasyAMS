@@ -4,7 +4,7 @@ Easy Agisoft MetaShape (EasyAMS) Plugin with extended functions for smart agricu
 
 ![img](docs/_static/gui.jpg)
 
-# How to use
+# Install
 
 > Please ensure you have the `Metashape Professional License` to have access to [automation option/Built-in python scripting](https://www.agisoft.com/features/compare/) function
 
@@ -12,7 +12,7 @@ Download the `tools/installer.py` in this project to your computer, and launch t
 
 ![img](docs/_static/launch.png)
 
-# Developer
+# For Developer
 
 ## 1) Source code install
 
@@ -32,7 +32,7 @@ If you have any modification for `installer.py`, rerun the `Run Python Script` w
 Recommend using [uv](https://docs.astral.sh/uv/getting-started/installation/) as virtual enviroment manager.
 
 ```
-> uv --version
+$ uv --version
 uv 0.6.14
 ```
 
@@ -51,14 +51,40 @@ pyproject.toml
 Using the following command to setup development enviroment:
 
 ```
-> cd C:\path\to\source\code\EasyAMS
-...EasyAMS > uv sync --all-groups
+$ cd C:\path\to\source\code\EasyAMS
+<repo> $ uv sync --all-groups
 ```
 
 It will create a `.venv` at current project folder and install the `tests` dependency group and `train` dependency group inside `pyproject.toml`.
 
 > PS: The default easyams plugin dependency is free of `pytorch` and `ultralytics`, only using the `onnx(cpu)` to inferencing and ensure the ease of installation.    
 > For model training and exporting, `labelme` is used for data annotation and the `pytorch` package is required.
+
+**To run tests**, you also need to manually download the wheel file from metashape official website [Python 3 Module](https://www.agisoft.com/downloads/installer/), then install to venv manually:
+
+```
+$ uv pip install path/to/Metashape-2.2.1-cp37.cp38.cp39.cp310.cp311-none-win_amd64.whl
+```
+
+For old wheel versions, please refer to [Metashape old version archive.md](https://gist.github.com/HowcanoeWang/6bc1fc5e29fb5af8a1cef6251f25375a)
+
+## 3) Build documents
+
+**Init documents** (Already done, no need to operate, just for notes)
+
+```bash
+<repo> $ uv run sphinx-quickstart
+```
+
+To build html, here need:
+
+```bash
+<repo> $ ./.venv/Source/activate
+<repo> $ make html
+
+# or
+<repo> $ uv run sphinx-build -M html sourcedir outputdir
+```
 
 
 # Error Fixs
