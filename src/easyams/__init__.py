@@ -1,7 +1,7 @@
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 from . import (
-    sahi_onnx, stag_gcp, img_loader, ui, utils, 
+    sahi_onnx, stag_gcp, img_loader, ui, utils, web_api
 )
 
 from .utils import (
