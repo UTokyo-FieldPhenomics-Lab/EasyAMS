@@ -1,6 +1,7 @@
 # gitignore in this project
 *.pt
-uv.lock
+tests/pdfs
+tests/whl
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
