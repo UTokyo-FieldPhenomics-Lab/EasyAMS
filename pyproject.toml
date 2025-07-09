@@ -32,14 +32,17 @@ classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
 dependencies = [
+    "furo>=2024.8.6",
     "numpy==1.26.4",
     "onnx==1.17.0",
     "onnxruntime==1.19.2",
     "opencv-python==4.10.0.84",
     "pillow>=8.2.0",
     "pybboxes>=0.1.6",
+    "pymupdf>=1.26.3",
     "requests>=2.32.3",
     "shapely>=2.0.0",
+    "sphinx>=7.4.7",
     "stag-python>=1.1.0",
     "tqdm>=4.67.1",
 ]
