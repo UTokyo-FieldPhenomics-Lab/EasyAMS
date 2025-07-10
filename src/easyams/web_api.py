@@ -15,7 +15,7 @@ class PDFDownloader():
         "2.0.4",
         "1.8.5",
         "1.7.6",
-        "1.6.5",
+        "1.6.6",
         "1.5.5",
         # then is named PhotoScan, prefer stop here
         # "1.4.4",
@@ -109,7 +109,7 @@ class PDFParser():
         # chapter infos
         self.heading_info = {}
 
-        self.now_page = 0
+        self.next_read_page = 0
 
     def parse_pages(self):
         self.parse_heading_page()
@@ -124,31 +124,47 @@ class PDFParser():
         self.heading_info["company"] = get_block_lines(blocks[2])
         self.heading_info["date"]    = get_block_lines(blocks[3])
         
-        self.now_page += 1
+        self.next_read_page += 1
 
     def parse_copyright_page(self):
-        reading = True
-        while reading:
-            page = self.doc[self.now_page]
+        while True:
+            page = self.doc[self.next_read_page]
+            self.next_read_page += 1
 
             if page_contains(page, "Copyright"):
                 blocks = get_page_block_content(page, self.header_bottom, self.footer_top)
                 self.heading_info['copyright'] = get_block_lines(blocks[0])
-                reading = False
+                return
 
-            self.now_page += 1
-
-            if not reading:
+    def parse_one_chapter_blocks(self, start_content="CHAPTER ONE", stop_content="CHAPTER TWO"):
+        # Using Generator to save momory cost
+        recording = False
+        while True:
+            page = self.doc[self.next_read_page]
+            print("now_page: ", self.next_read_page)
+            self.next_read_page += 1
+            
+            if page_contains(page, start_content):
+                recording = True
+                
+            if page_contains(page, stop_content):
+                recording = False
+                self.next_read_page -= 1
                 break
 
-    def parse_chapter_one(self):
-        pass
+            if recording:
+                blocks = get_page_block_content(page, self.header_bottom, self.footer_top)
 
-    def prase_chapter_two(self):
-        pass
-
-    def remove_header_footer(self, block):
-        pass
+                if len(blocks) > 0:
+                    for block in blocks:
+                        yield block
+                else:
+                    # meet the blank page, 
+                    # In metashape documents, blank pages means prepare for new chapters
+                    # stop reading for this chapter
+                    print(f":: Getting blank page with blocks num = {len(blocks)}")
+                    recording = False
+                    return
 
     def close(self):
         if hasattr(self, "doc") and not self.doc.is_closed:
@@ -189,7 +205,7 @@ def page_contains(page, text):
     else:
         return False
 
-def parse_block(block_dict):
+def parse_block_lists(block_dict):
     """_summary_
 
     Parameters
