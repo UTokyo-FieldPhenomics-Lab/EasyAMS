@@ -1,6 +1,5 @@
 import os
 import pytest
-import shutil
 
 from easyams import web_api
 
@@ -8,14 +7,33 @@ def test_copy_conf():
 
     conf_out_dir = "tests/outputs/docs/"
 
-    # clear cache data
+    conf_file = os.path.join( conf_out_dir, "conf.py")
+
+    if not os.path.exists(conf_out_dir):
+        os.makedirs(conf_out_dir)
+    # clear cache conf.py
     if os.path.exists(conf_out_dir):
-        shutil.rmtree(conf_out_dir)
-    os.makedirs(conf_out_dir)
+        os.remove(conf_file)
 
     web_api.copy_sphinx_config(conf_out_dir)
 
-    assert os.path.exists( os.path.join( conf_out_dir, "conf.py") )
+    assert os.path.exists( conf_file )
+
+def test_build_sphinx_html():
+
+    source_dir = "tests/outputs/docs/"
+    build_dir = os.path.join(source_dir, "_build")
+
+    index_rst = os.path.join( source_dir, "index.rst" ) 
+    os.remove(index_rst)
+    with open(index_rst, 'w', encoding='utf-8') as f:
+        f.write(".. EasyAMS documentation test file\n\n")
+        f.write("Welcome to EasyAMS's documentation!\n")
+        f.write("===================================\n\n")
+
+    web_api.build_sphinx_html(source_dir, build_dir, rebuild=True)
+
+    assert os.path.exists( os.path.join( build_dir, "html", "index.html") )
 
 def test_load_pdf():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"

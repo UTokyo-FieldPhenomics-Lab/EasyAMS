@@ -1,4 +1,7 @@
 import os
+import sys
+import subprocess
+import shutil
 import time
 import requests
 from packaging.version import Version
@@ -18,6 +21,28 @@ def copy_sphinx_config(save_path):
     with open(conf_from_path, 'rb') as src, \
          open(conf_to_path,   'wb') as dst:
             dst.write(src.read())
+
+def build_sphinx_html(source_dir, build_dir, rebuild=False):
+    """Command to bulid Sphinx docs, modified from makefile & make.bat of sphinx project"""
+
+    if not os.path.exists( os.path.join( source_dir, "conf.py" ) ):
+        copy_sphinx_config(source_dir)
+
+    if rebuild and os.path.exists( build_dir ):
+        shutil.rmtree(build_dir)
+
+    try:
+        cmd = [
+            "sphinx-build",
+            '-M', "html",
+            source_dir,
+            build_dir
+        ]
+        
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Build sphinx html failed: {e}", file=sys.stderr)
+        sys.exit(1)
 
 class PDFDownloader():
     # just manually type the lastest one version
