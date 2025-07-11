@@ -1,48 +1,9 @@
 import os
-import sys
-import subprocess
-import shutil
 import time
 import requests
 from packaging.version import Version
 
 import pymupdf
-
-def copy_sphinx_config(save_path):
-    if not os.path.exists(save_path):
-        os.makedirs(save_path, exist_ok=True)
-
-    conf_from_path = os.path.join(
-        os.path.dirname(__file__), 'web_api_sphinx_conf.py'
-    )
-
-    conf_to_path = os.path.join(save_path, 'conf.py')
-
-    with open(conf_from_path, 'rb') as src, \
-         open(conf_to_path,   'wb') as dst:
-            dst.write(src.read())
-
-def build_sphinx_html(source_dir, build_dir, rebuild=False):
-    """Command to bulid Sphinx docs, modified from makefile & make.bat of sphinx project"""
-
-    if not os.path.exists( os.path.join( source_dir, "conf.py" ) ):
-        copy_sphinx_config(source_dir)
-
-    if rebuild and os.path.exists( build_dir ):
-        shutil.rmtree(build_dir)
-
-    try:
-        cmd = [
-            "sphinx-build",
-            '-M', "html",
-            source_dir,
-            build_dir
-        ]
-        
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Build sphinx html failed: {e}", file=sys.stderr)
-        sys.exit(1)
 
 class PDFDownloader():
     # just manually type the lastest one version
@@ -135,7 +96,7 @@ class PDFDownloader():
             print(f"Version [{version_str}] is not available")
 
 
-class PDFParser():
+class MetashapePDFParser():
 
     def __init__(self, pdf_path):
         self.doc = pymupdf.open(pdf_path)
@@ -156,12 +117,12 @@ class PDFParser():
 
     def parse_heading_page(self):
         page = self.doc[0]
-        blocks = get_page_block_content(page, self.header_bottom, self.footer_top)
+        blocks = self.get_page_block_content(page, self.header_bottom, self.footer_top)
 
-        self.heading_info["title"]   = get_block_lines(blocks[0])
-        self.heading_info["version"] = get_block_lines(blocks[1])
-        self.heading_info["company"] = get_block_lines(blocks[2])
-        self.heading_info["date"]    = get_block_lines(blocks[3])
+        self.heading_info["title"]   = self.get_block_lines(blocks[0])
+        self.heading_info["version"] = self.get_block_lines(blocks[1])
+        self.heading_info["company"] = self.get_block_lines(blocks[2])
+        self.heading_info["date"]    = self.get_block_lines(blocks[3])
         
         self.next_read_page += 1
 
@@ -170,9 +131,9 @@ class PDFParser():
             page = self.doc[self.next_read_page]
             self.next_read_page += 1
 
-            if page_contains(page, "Copyright"):
-                blocks = get_page_block_content(page, self.header_bottom, self.footer_top)
-                self.heading_info['copyright'] = get_block_lines(blocks[0])
+            if self.page_contains(page, "Copyright"):
+                blocks = self.get_page_block_content(page, self.header_bottom, self.footer_top)
+                self.heading_info['copyright'] = self.get_block_lines(blocks[0])
                 return
 
     def parse_one_chapter_blocks(self, start_content="CHAPTER ONE", stop_content="CHAPTER TWO"):
@@ -183,16 +144,16 @@ class PDFParser():
             print("now_page: ", self.next_read_page)
             self.next_read_page += 1
             
-            if page_contains(page, start_content):
+            if self.page_contains(page, start_content):
                 recording = True
                 
-            if page_contains(page, stop_content):
+            if self.page_contains(page, stop_content):
                 recording = False
                 self.next_read_page -= 1
                 break
 
             if recording:
-                blocks = get_page_block_content(page, self.header_bottom, self.footer_top)
+                blocks = self.get_page_block_content(page, self.header_bottom, self.footer_top)
 
                 if len(blocks) > 0:
                     for block in blocks:
@@ -204,6 +165,41 @@ class PDFParser():
                     print(f":: Getting blank page with blocks num = {len(blocks)}")
                     recording = False
                     return
+                
+    @staticmethod
+    def get_page_block_content(page, header_y, footer_y):
+        blocks = page.get_text("dict")["blocks"]
+
+        keeped_blocks = []
+        # remove header and footer
+        for block in blocks:
+            x0, y0, x1, y1 = block['bbox']
+
+            max_y = max(y0, y1)
+            min_y = min(y0, y1)
+
+            if max_y > footer_y or min_y < header_y:
+                # footer and header
+                continue
+            
+            keeped_blocks.append(block)
+
+        return keeped_blocks
+
+    @staticmethod
+    def get_block_lines(block):
+        for line in block["lines"]:
+            line_text = ''.join(span["text"] for span in line["spans"])
+            return line_text
+
+    @staticmethod
+    def page_contains(page, text):
+        areas = page.search_for(text)
+
+        if len(areas) > 0:
+            return True
+        else:
+            return False
 
     def close(self):
         if hasattr(self, "doc") and not self.doc.is_closed:
@@ -212,70 +208,44 @@ class PDFParser():
     def __del__(self):
         self.close()
 
-def get_page_block_content(page, header_y, footer_y):
-    blocks = page.get_text("dict")["blocks"]
 
-    keeped_blocks = []
-    # remove header and footer
-    for block in blocks:
-        x0, y0, x1, y1 = block['bbox']
+class BlockParser():
+    
+    def __init__(self):
+        pass
 
-        max_y = max(y0, y1)
-        min_y = min(y0, y1)
+    def parse_block(block_dict):
+        """_summary_
 
-        if max_y > footer_y or min_y < header_y:
-            # footer and header
-            continue
-        
-        keeped_blocks.append(block)
+        Parameters
+        ----------
+        block_dict : _type_
+            _description_
 
-    return keeped_blocks
+        Notes
+        -----
+        Data Structures:
+        - ParagraphBlock
+            - Text
+            - Bold
+            - Code
+            - Links
+        - ListBlock
+            - Item
+        - CodeBlock
+        - NotesBlock
 
-def get_block_lines(block):
-    for line in block["lines"]:
-        line_text = ''.join(span["text"] for span in line["spans"])
-        return line_text
+        For each item, we have the following structure >>>
+        {
+            "type": plaintxt | notes | codes | bold | list | ref 
+            "text": pure strings of text, but if mixed, text
+        },
 
-def page_contains(page, text):
-    areas = page.search_for(text)
-
-    if len(areas) > 0:
-        return True
-    else:
-        return False
-
-def parse_block(block_dict):
-    """_summary_
-
-    Parameters
-    ----------
-    block_dict : _type_
-        _description_
-
-    Notes
-    -----
-    Data Structures:
-    - ParagraphBlock
-        - Text
-        - Bold
-        - Code
-        - Links
-    - ListBlock
-        - Item
-    - CodeBlock
-    - NotesBlock
-
-    For each item, we have the following structure >>>
-    {
-        "type": plaintxt | notes | codes | bold | list | ref 
-        "text": pure strings of text, but if mixed, text
-    },
-
-    For block item, it have the following structure >>> 
-    {
-        "type": block,
-        "level": 0 - 5
-        "child": [] list of each item
-    }
-    """
-    pass
+        For block item, it have the following structure >>> 
+        {
+            "type": block,
+            "level": 0 - 5
+            "child": [] list of each item
+        }
+        """
+        pass

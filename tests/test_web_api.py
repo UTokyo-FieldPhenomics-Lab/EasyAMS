@@ -12,7 +12,7 @@ def test_copy_conf():
     if not os.path.exists(conf_out_dir):
         os.makedirs(conf_out_dir)
     # clear cache conf.py
-    if os.path.exists(conf_out_dir):
+    if os.path.exists(conf_file):
         os.remove(conf_file)
 
     web_api.copy_sphinx_config(conf_out_dir)
@@ -37,13 +37,13 @@ def test_build_sphinx_html():
 
 def test_load_pdf():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
-    test_pdf = web_api.PDFParser(pdf_path)
+    test_pdf = web_api.MetashapePDFParser(pdf_path)
 
     assert test_pdf.page_count == 357
 
 def test_get_page_block_content():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
-    test_pdf = web_api.PDFParser(pdf_path)
+    test_pdf = web_api.MetashapePDFParser(pdf_path)
 
     header_bottom = 46
     footer_top = 742
@@ -54,14 +54,14 @@ def test_get_page_block_content():
 
     assert len(blocks) == 3
 
-    assert web_api.get_block_lines(blocks[0]) == "Metashape Python Reference, Release 2.2.1"
-    assert web_api.get_block_lines(blocks[1]) == "Copyright (c) 2025 Agisoft LLC."
-    assert web_api.get_block_lines(blocks[2]) == "CONTENTS"
+    assert test_pdf.get_block_lines(blocks[0]) == "Metashape Python Reference, Release 2.2.1"
+    assert test_pdf.get_block_lines(blocks[1]) == "Copyright (c) 2025 Agisoft LLC."
+    assert test_pdf.get_block_lines(blocks[2]) == "CONTENTS"
 
-    keeped_blocks = web_api.get_page_block_content(page, header_bottom, footer_top)
+    keeped_blocks = test_pdf.get_page_block_content(page, header_bottom, footer_top)
 
     assert len(keeped_blocks) == 1
-    assert web_api.get_block_lines(keeped_blocks[0]) == "Copyright (c) 2025 Agisoft LLC."
+    assert test_pdf.get_block_lines(keeped_blocks[0]) == "Copyright (c) 2025 Agisoft LLC."
 
     # using the next page, empty contents with only header and footer
     page = test_pdf.doc[5]
@@ -69,17 +69,17 @@ def test_get_page_block_content():
 
     assert len(blocks) == 2
 
-    assert web_api.get_block_lines(blocks[0]) == "Metashape Python Reference, Release 2.2.1"
-    assert web_api.get_block_lines(blocks[1]) == "2"
+    assert test_pdf.get_block_lines(blocks[0]) == "Metashape Python Reference, Release 2.2.1"
+    assert test_pdf.get_block_lines(blocks[1]) == "2"
     # not sure why "CONTENTS" footer missing
 
-    keeped_blocks = web_api.get_page_block_content(page, header_bottom, footer_top)
+    keeped_blocks = test_pdf.get_page_block_content(page, header_bottom, footer_top)
 
     assert len(keeped_blocks) == 0
 
-def test_parse_heading_page(prepare_test_pdf):
+def test_parse_heading_page():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
-    test_pdf = web_api.PDFParser(pdf_path)
+    test_pdf = web_api.MetashapePDFParser(pdf_path)
 
     test_pdf.parse_heading_page()
 
@@ -96,26 +96,26 @@ def test_parse_heading_page(prepare_test_pdf):
 
     assert test_pdf.next_read_page == 5
 
-def test_parse_block_lists():
-    pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
-    test_pdf = web_api.PDFParser(pdf_path)
+# def test_parse_block_lists():
+#     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
+#     test_pdf = web_api.MetashapePDFParser(pdf_path)
 
-    # Chapter one contents
-    page = test_pdf.doc[6]
-    blocks = web_api.get_page_block_content(page, test_pdf.header_bottom, test_pdf.footer_top)
+#     # Chapter one contents
+#     page = test_pdf.doc[6]
+#     blocks = test_pdf.get_page_block_content(page, test_pdf.header_bottom, test_pdf.footer_top)
 
-    block_content = web_api.parse_block(blocks)
+#     block_content = test_pdf.parse_block(blocks)
 
 def test_parse_chapter_one_block_iterator():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
-    test_pdf = web_api.PDFParser(pdf_path)
+    test_pdf = web_api.MetashapePDFParser(pdf_path)
 
     cp1_block_iter = test_pdf.parse_one_chapter_blocks(
         start_content="CHAPTER ONE", stop_content="CHAPTER TWO"
     )
 
     for block in cp1_block_iter:
-        lines = web_api.get_block_lines(block) 
+        lines = test_pdf.get_block_lines(block) 
         print( f">>> {lines}" )
 
         if len(lines) < 5:

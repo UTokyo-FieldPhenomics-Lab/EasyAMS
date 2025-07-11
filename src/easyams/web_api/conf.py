@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'MetashapePyDocs'
+project = 'Metashape Python API Documents'
 copyright = '2025, Agisoft'
 author = 'Howcanoe Wang'
 release = 'v0.0.1'
