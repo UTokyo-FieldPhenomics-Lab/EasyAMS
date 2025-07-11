@@ -2,6 +2,7 @@
 *.pt
 tests/pdfs
 tests/whl
+tests/outputs
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,6 +1,21 @@
+import os
 import pytest
+import shutil
 
 from easyams import web_api
+
+def test_copy_conf():
+
+    conf_out_dir = "tests/outputs/docs/"
+
+    # clear cache data
+    if os.path.exists(conf_out_dir):
+        shutil.rmtree(conf_out_dir)
+    os.makedirs(conf_out_dir)
+
+    web_api.copy_sphinx_config(conf_out_dir)
+
+    assert os.path.exists( os.path.join( conf_out_dir, "conf.py") )
 
 def test_load_pdf():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"
@@ -71,7 +86,7 @@ def test_parse_block_lists():
     page = test_pdf.doc[6]
     blocks = web_api.get_page_block_content(page, test_pdf.header_bottom, test_pdf.footer_top)
 
-    block_content = web_api.parse_block_lists(blocks)
+    block_content = web_api.parse_block(blocks)
 
 def test_parse_chapter_one_block_iterator():
     pdf_path = "tests/pdfs/metashape_python_api_2_2_1.pdf"

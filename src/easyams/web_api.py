@@ -5,6 +5,20 @@ from packaging.version import Version
 
 import pymupdf
 
+def copy_sphinx_config(save_path):
+    if not os.path.exists(save_path):
+        os.makedirs(save_path, exist_ok=True)
+
+    conf_from_path = os.path.join(
+        os.path.dirname(__file__), 'web_api_sphinx_conf.py'
+    )
+
+    conf_to_path = os.path.join(save_path, 'conf.py')
+
+    with open(conf_from_path, 'rb') as src, \
+         open(conf_to_path,   'wb') as dst:
+            dst.write(src.read())
+
 class PDFDownloader():
     # just manually type the lastest one version
     #    can be obtained from the lastest pdf Chapter 3
@@ -205,7 +219,7 @@ def page_contains(page, text):
     else:
         return False
 
-def parse_block_lists(block_dict):
+def parse_block(block_dict):
     """_summary_
 
     Parameters
