@@ -1,6 +1,6 @@
 # EasyAMS
 
-Easy Agisoft MetaShape (EasyAMS) Plugin with extended functions for smart agriculture.
+Easy Agisoft MetaShape Streamlining (EasyAMS) Plugin with extended functions for smart agriculture.
 
 ![img](docs/_static/gui.jpg)
 
