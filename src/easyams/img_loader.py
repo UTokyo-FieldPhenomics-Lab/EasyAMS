@@ -6,6 +6,8 @@ from PySide2.QtWidgets import (QWidget, QApplication, QVBoxLayout, QHBoxLayout, 
 from PySide2.QtCore import Qt
 import Metashape
 
+from .utils import mprint
+
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -122,19 +124,37 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
 
         self.ignored_folders = set()  # 存储用户选择忽略的文件夹
         
+        self.chunk_labels = [chunk.label for chunk in Metashape.app.document.chunks]
+
         try:
             for chunk in structure['chunks']:
                 # 检查chunk是否有效（包含图片或有效group）
-                is_valid_chunk = bool(chunk['images']) if not use_camera_groups else any(group['images'] for group in chunk['groups'])
-            
+                if not use_camera_groups:
+                    # 情况一：不使用相机组。
+                    # 直接检查当前 chunk 是否包含任何照片。
+                    is_valid_chunk = bool(chunk['images'])
+                else:
+                    # 情况二：使用相机组。
+                    # 遍历 chunk 内的所有相机组（groups），检查是否有任何一个组（group）包含照片。
+                    # any() 函数会在找到第一个包含照片的组后立即返回 True，效率较高。
+                    is_valid_chunk = any(group['images'] for group in chunk['groups'])
+                
                 # Add chunk item with checkbox
                 chunk_item = QTreeWidgetItem(self.tree_widget)
 
                 chunk_suffix = "Chunk" if is_valid_chunk else "invalid chunk without images"
 
                 chunk_item.setText(0, f"📁 {chunk['name']} ({chunk_suffix})")
-                chunk_item.setCheckState(0, Qt.Checked if is_valid_chunk else Qt.Unchecked)
                 chunk_item.setData(0, Qt.UserRole, chunk['path'])  # 存储完整路径
+
+                # 该项目中已经有了同名的chunk，默认不打上钩
+                is_exist_chunk = False
+                if chunk['name'] in self.chunk_labels:
+                    is_exist_chunk = True
+                    # >>> 后续还需要同步self.ignored_folders 来确保忽略
+                    self.ignored_folders.add(chunk_item.data(0, Qt.UserRole))
+
+                chunk_item.setCheckState(0, Qt.Checked if is_valid_chunk and not is_exist_chunk else Qt.Unchecked)
 
                 if not is_valid_chunk:
                     chunk_item.setFlags(chunk_item.flags() & ~Qt.ItemIsEnabled)  # 禁用无效chunk
@@ -176,6 +196,7 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
             # 连接itemChanged信号以跟踪复选框状态变化<sup>1</sup>
             self.tree_widget.itemChanged.connect(self.on_item_changed)
             self.tree_widget.expandAll()
+
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Error scanning folder: {str(e)}")
 
@@ -198,6 +219,7 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
             self.ignored_folders.add(item.data(0, Qt.UserRole))  # 添加到忽略列表<sup>1</sup>
         else:
             self.ignored_folders.discard(item.data(0, Qt.UserRole))  # 从忽略列表移除<sup>1</sup>
+
 
     def get_ignored_folders(self):
         """Return the list of folders marked for ignoring"""
