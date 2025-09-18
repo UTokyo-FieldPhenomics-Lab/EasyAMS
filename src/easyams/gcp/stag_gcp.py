@@ -6,11 +6,11 @@ import numpy as np
 import stag
 import Metashape
 
-from .sahi_onnx import AutoDetectionModel
-from .sahi_onnx.predict import get_sliced_prediction
+from easyams.sahi_onnx import AutoDetectionModel
+from easyams.sahi_onnx.predict import get_sliced_prediction
 
-from .ui import ProgressDialog
-from .utils import mprint
+from easyams.ui import ProgressDialog
+from easyams.utils import mprint
 
 def detect_stag_markers():
     app = QtWidgets.QApplication.instance()  # 获取当前Qt应用实例
@@ -26,7 +26,7 @@ class StagDetector(QtWidgets.QDialog):
 
         self.doc = Metashape.app.document
 
-        from . import system_info
+        from .. import system_info
         self.system_info = system_info
 
         self.init_onnx_file()
