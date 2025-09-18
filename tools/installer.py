@@ -647,7 +647,7 @@ if __name__ == "__main__":
         
         import easyams as ams
 
-        ams.ui.add_metashape_menu()
+        ams.add_metashape_menu()
 
     else:
         installer.main()
