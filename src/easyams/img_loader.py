@@ -241,14 +241,18 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                             
                             # Add images to group <sup>1</sup>
                             image_paths = [os.path.join(group['path'], img) for img in group['images']]
-                            ms_chunk.addPhotos(image_paths, group=camera_group.key) 
+                            ms_chunk.addPhotos(image_paths, group=camera_group.key,
+                                               load_xmp_accuracy=True,  # support loading RTK info
+                                               load_rpc_txt=True) 
 
                 else:
                     # Add images directly to chunk
                     images = chunk.get('images', [])
                     if images:
                         image_paths = [os.path.join(chunk['path'], img) for img in images]
-                        ms_chunk.addPhotos(image_paths)
+                        ms_chunk.addPhotos(image_paths, 
+                                           load_xmp_accuracy=True,   # support loading RTK info
+                                           load_rpc_txt=True)
 
             QMessageBox.information(self, "Success", "Images imported successfully!")
 
