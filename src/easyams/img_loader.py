@@ -85,7 +85,8 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         }
 
         # Build regular structure
-        for item in os.listdir(root_path):
+        #  增加文件名的排序
+        for item in sorted(os.listdir(root_path)):
             item_path = os.path.join(root_path, item)
             if os.path.isdir(item_path):
                 chunk_data = {
@@ -94,7 +95,8 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                     'groups': []
                 }
                 if use_camera_groups:
-                    for sub_item in os.listdir(item_path):
+                    #  增加文件名的排序
+                    for sub_item in sorted(os.listdir(item_path)):
                         sub_item_path = os.path.join(item_path, sub_item)
                         if os.path.isdir(sub_item_path):
                             group_data = {
