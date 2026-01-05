@@ -166,15 +166,18 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
 
                 chunk_suffix = "Chunk" if is_valid_chunk else "invalid chunk without images"
 
+                # Check if chunk exists in project
+                is_exist_chunk = (chunk['name'] in self.chunk_labels)
+                if is_exist_chunk:
+                    if is_valid_chunk:
+                        chunk_suffix += ", exists"
+                
                 chunk_item.setText(0, f"📁 {chunk['name']} ({chunk_suffix})")
                 chunk_item.setData(0, Qt.UserRole, chunk['path'])  # 存储完整路径
-
-                # 该项目中已经有了同名的chunk，默认不打上钩
-                is_exist_chunk = False
-                if chunk['name'] in self.chunk_labels:
-                    is_exist_chunk = True
+                
+                if is_exist_chunk:
                     # >>> 后续还需要同步self.ignored_folders 来确保忽略
-                    self.ignored_folders.add(chunk_item.data(0, Qt.UserRole))
+                    self.ignored_folders.add(chunk['path'])
 
                 chunk_item.setCheckState(0, Qt.Checked if is_valid_chunk and not is_exist_chunk else Qt.Unchecked)
 
@@ -306,6 +309,9 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         use_camera_groups = self.camera_group_cb.isChecked()
         structure = self.get_folder_structure(self.root_path, use_camera_groups)
         
+        existing_labels = set(c.label for c in doc.chunks)
+        apply_to_all_choice = None # None, 'create', 'skip'
+        
         try:
             for chunk in structure['chunks']:
                 # 跳过未选中的chunk
@@ -313,6 +319,38 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                 if chunk_path in self.ignored_folders:
                     continue
             
+                # Check for duplicates and ask user if needed
+                if chunk['name'] in existing_labels:
+                    valid_choice = 'create' # default
+                    
+                    if apply_to_all_choice:
+                        valid_choice = apply_to_all_choice
+                    else:
+                        # Show Warning Dialog
+                        msg = QMessageBox(self)
+                        msg.setWindowTitle("Duplicate Chunk Detected")
+                        msg.setText(f"The chunk '{chunk['name']}' already exists in the project.")
+                        msg.setInformativeText(f"Do you want to create a new chunk for '{chunk['name']}' or skip it?")
+                        
+                        btn_create = msg.addButton("Create New", QMessageBox.AcceptRole)
+                        btn_skip = msg.addButton("Skip", QMessageBox.RejectRole)
+                        
+                        cb_apply = QCheckBox("Apply to all future conflicts")
+                        msg.setCheckBox(cb_apply)
+                        
+                        msg.exec_()
+                        
+                        if msg.clickedButton() == btn_skip:
+                            valid_choice = 'skip'
+                        else:
+                            valid_choice = 'create'
+                            
+                        if cb_apply.isChecked():
+                            apply_to_all_choice = valid_choice
+                    
+                    if valid_choice == 'skip':
+                        continue
+
                 # Create new chunk
                 ms_chunk = doc.addChunk()
                 ms_chunk.label = chunk['name']
