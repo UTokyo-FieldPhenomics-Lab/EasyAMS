@@ -6,8 +6,6 @@ from PySide2.QtWidgets import (QWidget, QApplication, QVBoxLayout, QHBoxLayout, 
 from PySide2.QtCore import Qt
 import Metashape
 
-from .utils import mprint
-
 class BatchImageLoader(QDialog):  # 继承自QDialog
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -82,7 +80,7 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         self.root_path = ""
         self.img_ext = ('.jpg', '.jpeg', '.png', '.tif', '.tiff')
 
-        from . import system_info
+        from .. import system_info
         self.config_manager = system_info.config_manager
     
     def select_folder(self):
