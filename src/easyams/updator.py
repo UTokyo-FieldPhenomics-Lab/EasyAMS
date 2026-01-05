@@ -190,10 +190,10 @@ class UpdateDialog(QDialog):
 
             is_okay = execude_command(cmd, workdir=self.system_info.easyams_venv_folder)
             if is_okay:
-                mprint("[EasyAMS] Packages updated successfully via uv.")
+                mprint("Packages updated successfully via uv.")
                 return True
             else:
-                mprint("[EasyAMS] Failed update dependencies via uv.")
+                mprint("Failed update dependencies via uv.")
                 Metashape.app.messageBox("Package automatic update failed via uv. Please check your network connections or report an issue to EasyAMS.")
                 return False
 
@@ -277,11 +277,11 @@ class UpdateCheckerThread(QThread):
 
     def run(self):
         try:
-            mprint(f"[EasyAMS] Checking for updates in background...")
+            mprint(f"Checking for updates in background...")
             ver, has_updates = check_updates()
             self.update_checked.emit(has_updates)
         except Exception as e:
-            mprint(f"[EasyAMS] Failed to check for updates in background: {e}")
+            mprint(f"Failed to check for updates in background: {e}")
             self.update_checked.emit(False)
 
 # Keep a reference to the thread to prevent garbage collection
@@ -295,7 +295,7 @@ def check_updates_on_startup():
         if has_updates:
             Metashape.app.messageBox("EasyAMS update available, please check for updates in the menu.")
         else:
-            mprint("[EasyAMS] EasyAMS is up to date.")
+            mprint("EasyAMS is up to date.")
 
     _update_thread = UpdateCheckerThread()
     _update_thread.update_checked.connect(on_update_checked)

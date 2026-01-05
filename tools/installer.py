@@ -1,4 +1,4 @@
-__version__ = "0.0.5"
+__version__ = "0.0.6"
 
 import os
 import sys
@@ -187,10 +187,10 @@ class Installer:
             return True
     
     def print_paths(self):
-        mprint(f"[EasyAMS] Platform: {self.system}")
-        mprint(f"[EasyAMS] Metashape Buildin Python Executable Path: {self.metashape_python_executable_path}")
-        mprint(f"[EasyAMS] User Plugin Script Path: {self.metashape_user_script_folder}")
-        mprint(f"[EasyAMS] Current Installer Path: {self.easyams_installer_folder}")
+        mprint(f"Platform: {self.system}")
+        mprint(f"Metashape Buildin Python Executable Path: {self.metashape_python_executable_path}")
+        mprint(f"User Plugin Script Path: {self.metashape_user_script_folder}")
+        mprint(f"Current Installer Path: {self.easyams_installer_folder}")
 
     def in_dev_mode(self):
         self.is_dev = True
@@ -223,7 +223,7 @@ class Installer:
                     return False
 
     def create_venv(self):
-        mprint("[EasyAMS][Func] Creating virtual environment...")
+        mprint("[Func] Creating virtual environment...")
 
         # create venv using uv
         install_same_py_cmd = [
@@ -234,9 +234,9 @@ class Installer:
         ]
         is_okay = execude_command(install_same_py_cmd)
         if is_okay:
-            mprint("[EasyAMS] python with same version as Metashape installed successfully.")
+            mprint("python with same version as Metashape installed successfully.")
         else:
-            mprint("[EasyAMS] Failed to install python same version as Metashape.")
+            mprint("Failed to install python same version as Metashape.")
 
         # create venv using uv
         create_venv_cmd = [
@@ -249,9 +249,9 @@ class Installer:
         is_okay = execude_command(create_venv_cmd)
 
         if is_okay:
-            mprint("[EasyAMS] virtual isolated python venv created")
+            mprint("virtual isolated python venv created")
         else:
-            mprint("[EasyAMS] virtual isolated python venv creation failed")
+            mprint("virtual isolated python venv creation failed")
 
         return is_okay
 
@@ -288,7 +288,7 @@ class Installer:
             return self.venv_is_ready
         
     def install_easyams_dependencies(self):
-        mprint(f'[EasyAMS][Func] Installing dependencies...')
+        mprint(f'[Func] Installing dependencies...')
 
         if self.venv_is_ready or self.venv_ready():
 
@@ -313,13 +313,13 @@ class Installer:
 
             is_okay = execude_command(cmd, workdir=self.easyams_venv_folder)
             if is_okay:
-                mprint("[EasyAMS] Dependencies installed successfully.")
+                mprint("Dependencies installed successfully.")
                 # Metashape.app.messageBox("EasyAMS dependencies successfully installed.")
             else:
-                mprint("[EasyAMS] Failed to install dependencies.")
+                mprint("Failed to install dependencies.")
 
     def add_venv_to_path(self):
-        mprint(f'[EasyAMS][Func] Adding virtual environment to PATH...')
+        mprint(f'[Func] Adding virtual environment to PATH...')
 
         if self.venv_is_ready or self.venv_ready():
 
@@ -393,10 +393,10 @@ class Installer:
         if not self.is_blank_metashape_project():
             return
 
-        mprint("[EasyAMS] Initializing the plugin...")
+        mprint("Initializing the plugin...")
 
         if not self.is_uv_installed():
-            raise FileNotFoundError("[EasyAMS] Can not find system uv or plugin bulit-in uv for setting up dependencies")
+            raise FileNotFoundError("Can not find system uv or plugin bulit-in uv for setting up dependencies")
 
         # create virtual envs
         if not self.venv_ready():
