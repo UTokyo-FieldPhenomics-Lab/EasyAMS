@@ -490,7 +490,7 @@ Root/
         
         help_dialog.exec_()
 
-def create_batch_image_loader():
+def create_batch_image_importer():
     app = QApplication.instance()  # 获取当前Qt应用实例
     window = BatchImageLoader(app.activeWindow())
     window.exec_()  # 使用exec_()而非show()确保模态性
