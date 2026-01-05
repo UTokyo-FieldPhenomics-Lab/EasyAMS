@@ -191,12 +191,20 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
                         group_suffix = "Camera Group" if is_valid_group else "invalid camera group without images"
 
                         group_item.setText(0, f"📷 {group['name']} ({group_suffix})")
-                        group_item.setCheckState(0, Qt.Checked if is_valid_group else Qt.Unchecked)
                         group_item.setData(0, Qt.UserRole, group['path'])
+                        group_item.setData(0, Qt.UserRole + 1, is_valid_group)
 
                         if not is_valid_group:
+                            group_item.setCheckState(0, Qt.Unchecked)
                             group_item.setFlags(group_item.flags() & ~Qt.ItemIsEnabled)  # 禁用无效group
                             continue
+
+                        if is_exist_chunk:
+                             # Parent is unchecked (due to existence), so child should be disabled
+                            group_item.setCheckState(0, Qt.Unchecked)
+                            group_item.setFlags(group_item.flags() & ~Qt.ItemIsEnabled)
+                        else:
+                            group_item.setCheckState(0, Qt.Checked)
                             
                         # Add sample images (no checkboxes for images)
                         for img in group['images'][:3]:  # Show first 3 as sample
@@ -227,15 +235,31 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         state = item.checkState(0)
 
         # 同步子项状态
+        # 同步子项状态
         if item.parent() is None:  # 如果是chunk顶级项
             for i in range(item.childCount()):
                 child = item.child(i)
-                child.setCheckState(0, state)
+                
+                # Check if this is a structural child (group) or just an image leaf
+                # Structural items have path in UserRole
+                if not child.data(0, Qt.UserRole):
+                    continue
 
+                is_valid = child.data(0, Qt.UserRole + 1)
+                
                 if state == Qt.Unchecked:
-                    self.ignored_folders.add(child.data(0, Qt.UserRole))
-                else:
-                    self.ignored_folders.discard(child.data(0, Qt.UserRole))
+                    # Parent disabled -> Disable and uncheck all children
+                    child.setFlags(child.flags() & ~Qt.ItemIsEnabled)
+                    child.setCheckState(0, Qt.Unchecked)
+                elif state == Qt.Checked:
+                    # Parent enabled -> Enable valid children and check them
+                    if is_valid:
+                        child.setFlags(child.flags() | Qt.ItemIsEnabled)
+                        child.setCheckState(0, Qt.Checked)
+                    else:
+                        # Invalid children remain disabled
+                        child.setFlags(child.flags() & ~Qt.ItemIsEnabled)
+                        child.setCheckState(0, Qt.Unchecked)
 
         if state == Qt.Unchecked:
             self.ignored_folders.add(item.data(0, Qt.UserRole))  # 添加到忽略列表<sup>1</sup>
