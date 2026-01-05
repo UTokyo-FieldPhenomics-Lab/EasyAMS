@@ -4,6 +4,7 @@ from packaging.version import Version
 from dataclasses import dataclass
 from typing import Optional
 
+from PySide2.QtCore import QThread, Signal
 from PySide2.QtWidgets import (
     QApplication, QDialog, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
 )
@@ -263,3 +264,39 @@ def check_updates_ui():
     app = QApplication.instance()  # 获取当前Qt应用实例
     window = UpdateDialog(app.activeWindow())
     window.exec_()  # 使用exec_()而非show()确保模态性
+
+#=========================
+# start up update checker
+#=========================
+
+class UpdateCheckerThread(QThread):
+    # Signal to emit (has_updates, version_info)
+    # But checking check_updates() returns (ver, has_updates)
+    # We will pass has_updates back.
+    update_checked = Signal(bool)
+
+    def run(self):
+        try:
+            mprint(f"[EasyAMS] Checking for updates in background...")
+            ver, has_updates = check_updates()
+            self.update_checked.emit(has_updates)
+        except Exception as e:
+            mprint(f"[EasyAMS] Failed to check for updates in background: {e}")
+            self.update_checked.emit(False)
+
+# Keep a reference to the thread to prevent garbage collection
+_update_thread = None
+
+def check_updates_on_startup():
+    global _update_thread
+    
+    # Define the slot to handle the result in the main thread
+    def on_update_checked(has_updates):
+        if has_updates:
+            Metashape.app.messageBox("EasyAMS update available, please check for updates in the menu.")
+        else:
+            mprint("[EasyAMS] EasyAMS is up to date.")
+
+    _update_thread = UpdateCheckerThread()
+    _update_thread.update_checked.connect(on_update_checked)
+    _update_thread.start()

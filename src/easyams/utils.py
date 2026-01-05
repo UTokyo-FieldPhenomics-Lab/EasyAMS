@@ -12,7 +12,8 @@ import Metashape
 from typing import Dict, Optional, Tuple
 
 def mprint(*values, **kwargs):
-    print(*values, **kwargs)
+    prefixed_values = ["[EasyAMS]"] + list(values)
+    print(*prefixed_values, **kwargs)
     Metashape.app.update()
 
 def execude_command(cmd, workdir=None):
