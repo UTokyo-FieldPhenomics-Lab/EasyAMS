@@ -35,7 +35,18 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         self.camera_group_cb.stateChanged.connect(self.update_preview)
         
         # Preview tree
+        self.preview_layout = QHBoxLayout()
         self.preview_label = QLabel("Import Preview:")
+        self.btn_select_all = QPushButton("Select All")
+        self.btn_select_all.clicked.connect(self.select_all_items)
+        self.btn_clear_all = QPushButton("Clear")
+        self.btn_clear_all.clicked.connect(self.clear_all_items)
+
+        self.preview_layout.addWidget(self.preview_label)
+        self.preview_layout.addStretch()
+        self.preview_layout.addWidget(self.btn_select_all)
+        self.preview_layout.addWidget(self.btn_clear_all)
+
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderLabel("Workspace Structure")
         
@@ -51,7 +62,8 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         # Add widgets to layout
         self.layout.addLayout(self.folder_layout)
         self.layout.addWidget(self.camera_group_cb)
-        self.layout.addWidget(self.preview_label)
+
+        self.layout.addLayout(self.preview_layout)
         self.layout.addWidget(self.tree_widget)
         self.layout.addWidget(self.help_btn)
         self.layout.addWidget(self.import_btn)
@@ -226,6 +238,22 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
     def get_ignored_folders(self):
         """Return the list of folders marked for ignoring"""
         return list(self.ignored_folders)
+
+    def select_all_items(self):
+        """Select all enabled items in the tree"""
+        root = self.tree_widget.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            if item.flags() & Qt.ItemIsEnabled:
+                item.setCheckState(0, Qt.Checked)
+
+    def clear_all_items(self):
+        """Unselect all items in the tree"""
+        root = self.tree_widget.invisibleRootItem()
+        for i in range(root.childCount()):
+            item = root.child(i)
+            # Even disabled items can be unchecked safely
+            item.setCheckState(0, Qt.Unchecked)
 
     
     def import_images(self):
