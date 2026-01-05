@@ -37,6 +37,12 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
         # Preview tree
         self.preview_layout = QHBoxLayout()
         self.preview_label = QLabel("Import Preview:")
+
+        self.btn_expand_all = QPushButton("Expand All")
+        self.btn_expand_all.clicked.connect(self.expand_all_items)
+        self.btn_collapse_all = QPushButton("Collapse All")
+        self.btn_collapse_all.clicked.connect(self.collapse_all_items)
+
         self.btn_select_all = QPushButton("Select All")
         self.btn_select_all.clicked.connect(self.select_all_items)
         self.btn_clear_all = QPushButton("Clear")
@@ -44,6 +50,8 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
 
         self.preview_layout.addWidget(self.preview_label)
         self.preview_layout.addStretch()
+        self.preview_layout.addWidget(self.btn_expand_all)
+        self.preview_layout.addWidget(self.btn_collapse_all)
         self.preview_layout.addWidget(self.btn_select_all)
         self.preview_layout.addWidget(self.btn_clear_all)
 
@@ -254,6 +262,14 @@ class BatchImageLoader(QDialog):  # 继承自QDialog
             item = root.child(i)
             # Even disabled items can be unchecked safely
             item.setCheckState(0, Qt.Unchecked)
+
+    def expand_all_items(self):
+        """Expand all items in the tree"""
+        self.tree_widget.expandAll()
+
+    def collapse_all_items(self):
+        """Collapse all items in the tree"""
+        self.tree_widget.collapseAll()
 
     
     def import_images(self):
