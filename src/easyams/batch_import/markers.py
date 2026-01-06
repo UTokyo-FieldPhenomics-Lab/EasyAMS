@@ -5,7 +5,7 @@ from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                               QTabWidget, QWidget, QListWidget, QLineEdit, 
                               QTableWidget, QTableWidgetItem, QComboBox, 
                               QSpinBox, QGroupBox, QFileDialog, QMessageBox, QSplitter,
-                              QHeaderView, QAbstractItemView, QGridLayout)
+                              QHeaderView, QAbstractItemView, QGridLayout, QFrame, QFormLayout)
 from PySide2.QtCore import Qt
 import Metashape
 
@@ -60,18 +60,18 @@ class BatchMarkerManager(QDialog):
 
         # Right Side: Tabs
         self.tabs = QTabWidget()
+        self.tabs.setDocumentMode(True) # Metashape-like style
         self.splitter.addWidget(self.tabs)
         
         # Initialize Data
         self.refresh_tree_data()
         
         # Add Tabs
-        self.init_tab1_manage()
+        self.init_tab1_ui()
         self.tabs.addTab(self.tab1, "Manage Markers")
-        self.init_tab2_rename()
-        self.tabs.addTab(self.tab2, "Rename")
-        self.init_tab3_import()
-        self.tabs.addTab(self.tab3, "Import CSV")
+        # Rename logic merged into tab1
+        self.init_tab2_ui()
+        self.tabs.addTab(self.tab2, "Import CSV")
 
         # Adjust splitter ratio
         self.splitter.setSizes([400, 600])
@@ -132,41 +132,77 @@ class BatchMarkerManager(QDialog):
     def get_all_chunks(self):
         return Metashape.app.document.chunks
 
-    # --- Tab 1: Manage Markers ---
-    def init_tab1_manage(self):
+    # --- Tab 1: Manage & Rename Markers ---
+    def init_tab1_ui(self):
         self.tab1 = QWidget()
-        layout = QVBoxLayout()
+        # Main Layout: Horizontal (List Left | Controls Right)
+        layout = QHBoxLayout()
         self.tab1.setLayout(layout)
         
-        layout.addWidget(QLabel("Unique Markers across all chunks:"))
+        # --- Left: List ---
+        left_layout = QVBoxLayout()
+        left_layout.addWidget(QLabel("Unique Markers:"))
         self.marker_list = QListWidget()
         self.marker_list.setSelectionMode(QListWidget.ExtendedSelection)
-        layout.addWidget(self.marker_list)
+        left_layout.addWidget(self.marker_list)
+        layout.addLayout(left_layout, 1)
         
-        btn_layout = QHBoxLayout()
+        # --- Right: Controls ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout()
+        right_widget.setLayout(right_layout)
+        
+        # 1. Manage List Group
+        gb_manage = QGroupBox("Manage List")
+        gb_layout = QVBoxLayout()
+        
         self.input_add_marker = QLineEdit()
         self.input_add_marker.setPlaceholderText("New Marker Name")
+        gb_layout.addWidget(self.input_add_marker)
+        
+        hbox_add = QHBoxLayout()
         self.btn_add_marker = QPushButton("Add")
         self.btn_add_marker.clicked.connect(self.add_marker_to_list)
-        
         self.btn_remove_marker = QPushButton("Remove Selected")
         self.btn_remove_marker.clicked.connect(self.remove_marker_from_list)
         
-        btn_layout.addWidget(self.input_add_marker)
-        btn_layout.addWidget(self.btn_add_marker)
-        btn_layout.addWidget(self.btn_remove_marker)
-        layout.addLayout(btn_layout)
+        hbox_add.addWidget(self.btn_add_marker)
+        hbox_add.addWidget(self.btn_remove_marker)
+        gb_layout.addLayout(hbox_add)
         
-        action_layout = QHBoxLayout()
+        gb_manage.setLayout(gb_layout)
+        right_layout.addWidget(gb_manage)
+        
+        # 2. Rename Group
+        gb_rename = QGroupBox("Batch Rename")
+        rename_layout_box = QFormLayout()
+        
+        self.input_rename_from = QLineEdit()
+        self.input_rename_to = QLineEdit()
+        
+        rename_layout_box.addRow("Find:", self.input_rename_from)
+        rename_layout_box.addRow("Replace with:", self.input_rename_to)
+        
+        gb_rename.setLayout(rename_layout_box)
+        right_layout.addWidget(gb_rename)
+        
+        right_layout.addStretch()
+        
+        # 3. Actions
         self.btn_preview_changes = QPushButton("Preview Changes")
         self.btn_preview_changes.clicked.connect(self.preview_changes_tab1)
         
-        self.btn_apply_changes = QPushButton("Apply Changes")
+        self.btn_reset_changes = QPushButton("Reset All")
+        self.btn_reset_changes.clicked.connect(self.reset_tab1)
+        
+        self.btn_apply_changes = QPushButton("Apply All Changes")
         self.btn_apply_changes.clicked.connect(self.apply_changes_tab1)
         
-        action_layout.addWidget(self.btn_preview_changes)
-        action_layout.addWidget(self.btn_apply_changes)
-        layout.addLayout(action_layout)
+        right_layout.addWidget(self.btn_preview_changes)
+        right_layout.addWidget(self.btn_reset_changes)
+        right_layout.addWidget(self.btn_apply_changes)
+        
+        layout.addWidget(right_widget, 1)
 
         self.populate_unique_markers()
 
@@ -191,217 +227,167 @@ class BatchMarkerManager(QDialog):
             self.marker_list.takeItem(self.marker_list.row(item))
 
     def preview_changes_tab1(self):
-        current_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
+        # 1. Calculate Expected States
+        current_list_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
         original_markers = set(self.original_unique_markers)
         
-        added = current_markers - original_markers
-        removed = original_markers - current_markers
+        # Deletions: In original but NOT in list
+        to_delete = original_markers - current_list_markers
         
+        # Additions: In list but NOT in original
+        to_add = current_list_markers - original_markers
+        
+        # Renames: Valid original markers (not deleted) that match pattern
+        find_str = self.input_rename_from.text()
+        replace_str = self.input_rename_to.text()
+        to_rename = {} # old -> new
+        
+        if find_str:
+            for m in original_markers:
+                if m not in to_delete:
+                    new_name = m.replace(find_str, replace_str)
+                    if new_name != m:
+                        to_rename[m] = new_name
+
+        # 2. Update Tree Preview
         root = self.tree.invisibleRootItem()
         for i in range(root.childCount()):
             chunk_item = root.child(i)
             
-            # Reset existing styles
+            # Reset existing styles & clean names
             for j in range(chunk_item.childCount()):
                 child = chunk_item.child(j)
                 text = child.text(0)
-                # Clean name
-                name = text.replace("📍 ", "").replace("➕ ", "").strip()
+                # Parse raw name
+                raw_name = text.replace("📍 ", "").replace("➕ ", "").split(" -> ")[0].strip()
                 
-                if name in removed:
+                # Restore base state
+                child.setText(0, f"📍 {raw_name}")
+                child.setForeground(0, Qt.black)
+                font = child.font(0)
+                font.setStrikeOut(False)
+                child.setFont(0, font)
+                
+                # Check status
+                if raw_name in to_delete:
                     child.setForeground(0, Qt.red)
-                    font = child.font(0)
                     font.setStrikeOut(True)
                     child.setFont(0, font)
-                else:
-                    child.setForeground(0, Qt.black)
-                    font = child.font(0)
+                elif raw_name in to_rename:
+                    # Rename Preview style
+                    new_name = to_rename[raw_name]
+                    child.setText(0, f"📍 {raw_name} -> {new_name}")
+                    child.setForeground(0, Qt.blue) # Use Blue to signify modification
                     font.setStrikeOut(False)
                     child.setFont(0, font)
 
-            # Add new items preview (only if not already there to avoid duplicates)
-            current_children_names = set()
+            # Additions Preview (Avoid duplicates)
+            current_child_names = set()
             for j in range(chunk_item.childCount()):
-                txt = chunk_item.child(j).text(0)
-                current_children_names.add(txt.replace("📍 ", "").replace("➕ ", "").strip())
-
-            for new_marker in added:
-                if new_marker not in current_children_names:
-                    item = QTreeWidgetItem(chunk_item)
-                    item.setText(0, f"➕ {new_marker}")
-                    item.setForeground(0, Qt.green)
-                    for col in range(1, 7):
-                        item.setText(col, "-")
+                raw = chunk_item.child(j).text(0).replace("📍 ", "").replace("➕ ", "").split(" -> ")[0].strip()
+                current_child_names.add(raw)
+                
+            for new_marker in to_add:
+                 # Check if this addition is also affected by rename??
+                 # Usually Add -> Rename is sequential. 
+                 # Here we assume Add is final name.
+                 if new_marker not in current_child_names:
+                     item = QTreeWidgetItem(chunk_item)
+                     item.setText(0, f"➕ {new_marker}")
+                     item.setForeground(0, Qt.green)
+                     for col in range(1, 7): item.setText(col, "-")
 
     def apply_changes_tab1(self):
-        current_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
+        # Gather Rules
+        current_list_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
         original_markers = set(self.original_unique_markers)
         
-        added = current_markers - original_markers
-        removed = original_markers - current_markers
+        to_delete = original_markers - current_list_markers
+        to_add = current_list_markers - original_markers
         
-        root = self.tree.invisibleRootItem()
-        modified_chunks = 0
-        
-        for i in range(root.childCount()):
-            chunk_item = root.child(i)
-            if chunk_item.checkState(0) != Qt.Checked:
-                continue
-                
-            chunk_key = chunk_item.data(0, Qt.UserRole)
-            chunk = None
-            for c in Metashape.app.document.chunks:
-                if c.key == chunk_key:
-                    chunk = c
-                    break
-            
-            if not chunk: continue
-            
-            for marker in list(chunk.markers):
-                if marker.label in removed:
-                    chunk.remove(marker)
-            
-            for name in added:
-                existing = [m for m in chunk.markers if m.label == name]
-                if not existing:
-                    m = chunk.addMarker()
-                    m.label = name
-            
-            modified_chunks += 1
-
-        self.refresh_tree_data()
-        self.populate_unique_markers()
-        QMessageBox.information(self, "Success", f"Applied changes to {modified_chunks} chunks.")
-
-    # --- Tab 2: Rename Markers ---
-    def init_tab2_rename(self):
-        self.tab2 = QWidget()
-        layout = QVBoxLayout()
-        self.tab2.setLayout(layout)
-        
-        # Inputs
-        input_layout = QHBoxLayout()
-        self.input_rename_from = QLineEdit()
-        self.input_rename_from.setPlaceholderText("Find (substring)")
-        self.input_rename_to = QLineEdit()
-        self.input_rename_to.setPlaceholderText("Replace with")
-        
-        input_layout.addWidget(QLabel("Find:"))
-        input_layout.addWidget(self.input_rename_from)
-        input_layout.addWidget(QLabel("Replace:"))
-        input_layout.addWidget(self.input_rename_to)
-        layout.addLayout(input_layout)
-        
-        # Lists
-        lists_layout = QHBoxLayout()
-        
-        left_layout = QVBoxLayout()
-        left_layout.addWidget(QLabel("Original Names"))
-        self.list_rename_original = QListWidget()
-        left_layout.addWidget(self.list_rename_original)
-        
-        right_layout = QVBoxLayout()
-        right_layout.addWidget(QLabel("Preview Result"))
-        self.list_rename_preview = QListWidget()
-        right_layout.addWidget(self.list_rename_preview)
-        
-        lists_layout.addLayout(left_layout)
-        lists_layout.addLayout(right_layout)
-        layout.addLayout(lists_layout)
-        
-        # Buttons
-        btn_layout = QHBoxLayout()
-        self.btn_rename_preview = QPushButton("Preview Rename")
-        self.btn_rename_preview.clicked.connect(self.preview_rename)
-        self.btn_rename_reset = QPushButton("Reset")
-        self.btn_rename_reset.clicked.connect(self.reset_rename)
-        self.btn_rename_apply = QPushButton("Apply Rename")
-        self.btn_rename_apply.clicked.connect(self.apply_rename)
-        
-        btn_layout.addWidget(self.btn_rename_preview)
-        btn_layout.addWidget(self.btn_rename_reset)
-        btn_layout.addWidget(self.btn_rename_apply)
-        layout.addLayout(btn_layout)
-        
-        # Populate initial list (using shared unique markers if available, else refresh)
-        if hasattr(self, 'original_unique_markers'):
-             self.list_rename_original.addItems(self.original_unique_markers)
-             self.list_rename_preview.addItems(self.original_unique_markers)
-        else:
-             self.populate_unique_markers() # This updates shared list, need to sync
-             self.list_rename_original.addItems(self.original_unique_markers)
-             self.list_rename_preview.addItems(self.original_unique_markers)
-
-    def preview_rename(self):
         find_str = self.input_rename_from.text()
         replace_str = self.input_rename_to.text()
         
-        self.list_rename_preview.clear()
-        
-        for i in range(self.list_rename_original.count()):
-            original_name = self.list_rename_original.item(i).text()
-            new_name = original_name.replace(find_str, replace_str)
-            self.list_rename_preview.addItem(new_name)
-            
-            # Highlight changes
-            if new_name != original_name:
-                self.list_rename_preview.item(i).setForeground(Qt.blue)
-
-    def reset_rename(self):
-        self.input_rename_from.clear()
-        self.input_rename_to.clear()
-        self.list_rename_preview.clear()
-        for i in range(self.list_rename_original.count()):
-            self.list_rename_preview.addItem(self.list_rename_original.item(i).text())
-
-    def apply_rename(self):
-        count = self.list_rename_original.count()
-        renames = {} # old -> new
-        
-        for i in range(count):
-            old = self.list_rename_original.item(i).text()
-            new = self.list_rename_preview.item(i).text()
-            if old != new:
-                renames[old] = new
-        
-        if not renames:
-            return
-
         modified_chunks = 0
         root = self.tree.invisibleRootItem()
+        
         for i in range(root.childCount()):
             chunk_item = root.child(i)
-            if chunk_item.checkState(0) != Qt.Checked:
-                continue
+            if chunk_item.checkState(0) != Qt.Checked: continue
             
             chunk_key = chunk_item.data(0, Qt.UserRole)
             chunk = next((c for c in Metashape.app.document.chunks if c.key == chunk_key), None)
             if not chunk: continue
             
             chunk_modified = False
-            for marker in chunk.markers:
-                if marker.label in renames:
-                    marker.label = renames[marker.label]
+            
+            # 1. Deletions
+            for marker in list(chunk.markers):
+                if marker.label in to_delete:
+                    chunk.remove(marker)
+                    chunk_modified = True
+            
+            # 2. Renames (on remaining)
+            if find_str:
+                for marker in chunk.markers:
+                    new_name = marker.label.replace(find_str, replace_str)
+                    if new_name != marker.label:
+                        marker.label = new_name
+                        chunk_modified = True
+            
+            # 3. Additions
+            for name in to_add:
+                # Check exist (after rename!)
+                existing = [m for m in chunk.markers if m.label == name]
+                if not existing:
+                    m = chunk.addMarker()
+                    m.label = name
                     chunk_modified = True
             
             if chunk_modified:
                 modified_chunks += 1
-                
+
         self.refresh_tree_data()
         self.populate_unique_markers()
-        # Refresh lists in rename tab too
-        self.list_rename_original.clear()
-        self.list_rename_preview.clear()
-        self.list_rename_original.addItems(self.original_unique_markers)
-        self.list_rename_preview.addItems(self.original_unique_markers)
+        self.input_rename_from.clear()
+        self.input_rename_to.clear()
+        QMessageBox.information(self, "Success", f"Applied changes to {modified_chunks} chunks.")
+
+    def reset_tab1(self):
+        self.input_add_marker.clear()
+        self.input_rename_from.clear()
+        self.input_rename_to.clear()
+        # Reset list to original state
+        self.marker_list.clear()
+        self.marker_list.addItems(self.original_unique_markers)
+        # Reset Treeview Preview
+        root = self.tree.invisibleRootItem()
+        for i in range(root.childCount()):
+            chunk_item = root.child(i)
+            # Reset existing styles
+            for j in range(chunk_item.childCount()):
+                child = chunk_item.child(j)
+                text = child.text(0)
+                # Parse raw name if modified
+                if " -> " in text:
+                    raw_name = text.split(" -> ")[0].replace("📍 ", "").strip()
+                elif text.startswith("➕ "):
+                    # This is a purely new node, we should ideally remove it or hide it?
+                    # But wait, logic says "Add to list" adds "Add preview".
+                    # Real remove is: we just re-populate tree data from Metashape!
+                    # Actually, refresh_tree_data is cleaner.
+                    pass
+                else:
+                    raw_name = text.replace("📍 ", "").strip()
         
-        QMessageBox.information(self, "Success", f"Renamed markers in {modified_chunks} chunks.")
+        self.refresh_tree_data() # Easiest way to clear visual artifacts
+        QMessageBox.information(self, "Reset", "All pending changes cleared.")
 
     # --- Tab 3: Import Reference ---
-    def init_tab3_import(self):
-        self.tab3 = QWidget()
+    def init_tab2_ui(self):
+        self.tab2 = QWidget()
         layout = QVBoxLayout()
-        self.tab3.setLayout(layout)
+        self.tab2.setLayout(layout)
         
         # 1. Coordinate System
         crs_group = QGroupBox("Coordinate System")
@@ -484,7 +470,7 @@ class BatchMarkerManager(QDialog):
         # Actions
         action_layout = QHBoxLayout()
         self.btn_import_reset = QPushButton("Reset")
-        self.btn_import_reset.clicked.connect(self.reset_tab3)
+        self.btn_import_reset.clicked.connect(self.reset_tab2)
         self.btn_import_apply = QPushButton("Import Reference")
         self.btn_import_apply.clicked.connect(self.apply_import_reference)
         
@@ -605,7 +591,7 @@ class BatchMarkerManager(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to read CSV: {e}")
 
-    def reset_tab3(self):
+    def reset_tab2(self):
         self.spin_col_label.setValue(1)
         self.spin_col_x.setValue(2)
         self.spin_col_y.setValue(3)
