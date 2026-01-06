@@ -1,5 +1,7 @@
 import os
 import csv
+import re
+import pyproj
 from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton, 
                               QTreeWidget, QTreeWidgetItem, QLabel, QCheckBox, 
                               QTabWidget, QWidget, QListWidget, QLineEdit, 
@@ -9,6 +11,8 @@ from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                               QListWidgetItem)
 from PySide2.QtCore import Qt
 import Metashape
+
+from ..utils import mprint
 
 class BatchMarkerManager(QDialog):
     def __init__(self, parent=None):
@@ -519,7 +523,7 @@ class BatchMarkerManager(QDialog):
         self.columns_layout.addWidget(self.chk_accuracy, 0, 2)
 
         # Row 1: X / Longitude
-        self.lbl_col_x = QLabel("Longitude:")
+        self.lbl_col_x = QLabel("X (m):")
         self.columns_layout.addWidget(self.lbl_col_x, 1, 0)
         self.spin_col_x = QSpinBox()
         self.spin_col_x.setRange(1, 99)
@@ -534,7 +538,7 @@ class BatchMarkerManager(QDialog):
         self.columns_layout.addWidget(self.spin_prec_x, 1, 2)
 
         # Row 2: Y / Latitude
-        self.lbl_col_y = QLabel("Latitude:")
+        self.lbl_col_y = QLabel("Y (m):")
         self.columns_layout.addWidget(self.lbl_col_y, 2, 0)
         self.spin_col_y = QSpinBox()
         self.spin_col_y.setRange(1, 99)
@@ -548,7 +552,7 @@ class BatchMarkerManager(QDialog):
         self.columns_layout.addWidget(self.spin_prec_y, 2, 2)
 
         # Row 3: Z / Altitude
-        self.lbl_col_z = QLabel("Altitude:")
+        self.lbl_col_z = QLabel("Z (m):")
         self.columns_layout.addWidget(self.lbl_col_z, 3, 0)
         self.spin_col_z = QSpinBox()
         self.spin_col_z.setRange(1, 99)
@@ -632,7 +636,7 @@ class BatchMarkerManager(QDialog):
             self.spin_col_label.value() - 1: "Label",
             self.spin_col_x.value() - 1: self.lbl_col_x.text().replace(":", ""),
             self.spin_col_y.value() - 1: self.lbl_col_y.text().replace(":", ""),
-            self.spin_col_z.value() - 1: "Altitude",
+            self.spin_col_z.value() - 1: self.lbl_col_z.text().replace(":", ""),
         }
         
         if self.chk_accuracy.isChecked():
@@ -647,28 +651,62 @@ class BatchMarkerManager(QDialog):
     def populate_crs_options(self):
         self.combo_crs.clear()
         
-        # 1. Active Chunk CRS
-        active_chunk = Metashape.app.document.chunk
-        if active_chunk and active_chunk.crs:
-            self.combo_crs.addItem(f"Active: {active_chunk.crs.name}", active_chunk.crs)
+        # We will store items in a list first to check for duplicates
+        # Item format: (Label, Data)
+        items = []
         
-        # 2. Local
-        self.combo_crs.addItem("Local Coordinates (m)", None)
+        # 1. Local
+        items.append(("Local Coordinates (m)", Metashape.CoordinateSystem('LOCAL_CS["Local Coordinates (m)",LOCAL_DATUM["Local Datum",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]]]')))
         
-        # 3. WGS 84
-        self.combo_crs.addItem("WGS 84 (EPSG::4326)", Metashape.CoordinateSystem("EPSG::4326"))
+        # 2. WGS 84
+        items.append(("WGS 84 (EPSG::4326)", Metashape.CoordinateSystem("EPSG::4326")))
         
-        # 4. Other chunks CRSs
-        seen_crs = set()
-        if active_chunk and active_chunk.crs: seen_crs.add(active_chunk.crs.name)
-        seen_crs.add("EPSG::4326")
+        # 3. Other chunks CRSs
+        seen_crs_names = set([crs.name for _, crs in items])
         
         for chunk in Metashape.app.document.chunks:
-            if chunk.crs and chunk.crs.name not in seen_crs:
-                self.combo_crs.addItem(chunk.crs.name, chunk.crs)
-                seen_crs.add(chunk.crs.name)
+            if chunk.crs.name not in seen_crs_names:
+                items.append((chunk.crs.name, chunk.crs))
+                seen_crs_names.add(chunk.crs.name)
+        
+        # 4. Add items to Combo
+        self.combo_crs.blockSignals(True)
+        for label, data in items:
+            self.combo_crs.addItem(label, data)
+        self.combo_crs.blockSignals(False)
+            
+        # 5. Handle Active Chunk Selection
+        # If active chunk has CRS, try to find it in the list.
+        # if active_chunk and active_chunk.crs:
+        #     active_wkt = active_chunk.crs.wkt
+        #     found_index = -1
+            
+        #     for i in range(self.combo_crs.count()):
+        #         item_data = self.combo_crs.itemData(i)
+        #         # Check match
+        #         if item_data is None: continue # Skip Local
                 
-        # 5. More...
+        #         if isinstance(item_data, Metashape.CoordinateSystem):
+        #             if item_data.wkt == active_wkt:
+        #                 found_index = i
+        #                 break
+            
+        #     self.combo_crs.blockSignals(True)
+        #     if found_index >= 0:
+        #         self.combo_crs.setCurrentIndex(found_index)
+        #     else:
+        #         # Add as Active
+        #         self.combo_crs.insertItem(0, f"Active: {active_chunk.crs.name}", active_chunk.crs)
+        #         self.combo_crs.setCurrentIndex(0)
+        #     self.combo_crs.blockSignals(False)
+        # else:
+        #     # Active chunk is Local (None)
+        #     idx = self.combo_crs.findText("Local Coordinates (m)")
+        #     self.combo_crs.blockSignals(True)
+        #     if idx >= 0: self.combo_crs.setCurrentIndex(idx)
+        #     self.combo_crs.blockSignals(False)
+
+        # 6. More...
         self.combo_crs.addItem("More...", "MORE")
 
     def on_crs_changed(self, index):
@@ -677,25 +715,69 @@ class BatchMarkerManager(QDialog):
             crs = Metashape.app.getCoordinateSystem()
             if crs:
                 # Add and select
+                self.combo_crs.blockSignals(True)
                 self.combo_crs.insertItem(self.combo_crs.count()-1, crs.name, crs)
                 self.combo_crs.setCurrentIndex(self.combo_crs.count()-2)
+                self.combo_crs.blockSignals(False)
                 data = crs
             else:
                  # Revert to previous valid? Or just select index 0?
+                 self.combo_crs.blockSignals(True)
                  self.combo_crs.setCurrentIndex(0)
+                 self.combo_crs.blockSignals(False)
                  return
 
-        # Update labels
-        is_geo = False
-        if isinstance(data, Metashape.CoordinateSystem):
-            if data.geogcs: is_geo = True
+        # Update labels by parsing CRS
+        labels = ["X (m):", "Y (m):", "Z (m):"] # Default
+
+        unit_dict = {"degree": "°", "metre": "m"}
+        
+        if isinstance(data, Metashape.CoordinateSystem) and data.name != "Local Coordinates (m)":
+            mprint(f"[Tab2]:CRS: selected to {data}")
+            success = False
+            # Try PyProj first (Generic & Robust)
+            try:
+                crs_obj = pyproj.CRS(data.wkt)
+                axes = crs_obj.axis_info
+                mprint(f"[Tab2]:CRS: crs_obj={crs_obj}\n        axes={axes}\n")
+
+                if axes and len(axes) >= 2:
+                    labels[0] = f"{axes[0].name if len(axes[0].name) < 10 else axes[0].abbrev} " \
+                                f"({unit_dict.get(axes[0].unit_name, axes[0].unit_name)}):"   
+                    labels[1] = f"{axes[1].name if len(axes[1].name) < 10 else axes[1].abbrev} " \
+                                f"({unit_dict.get(axes[1].unit_name, axes[1].unit_name)}):"
+                    if len(axes) > 2:
+                         labels[2] = f"{axes[2].name if len(axes[2].name) < 10 else axes[2].abbrev} " \
+                                     f"({unit_dict.get(axes[2].unit_name, axes[2].unit_name)}):"
+                    else:
+                         labels[2] = "Altitude (m):" # Default for Z if missing in 2D CRS
+                    success = True
+                    mprint(f"[Tab2]:CRS: parsed labels -> {labels}")
+            except Exception as e:
+                mprint(f"[Tab2]:CRS: PyProj failed: {e}")
+                pass
             
-        if is_geo:
-            self.lbl_col_x.setText("Longitude:")
-            self.lbl_col_y.setText("Latitude:")
-        else:
-            self.lbl_col_x.setText("Easting (m):")
-            self.lbl_col_y.setText("Northing (m):")
+            if not success:
+                mprint(f"[Tab2]:CRS: Parse {data} wkt: {data.wkt} wk2: {data.wkt2} failed, try string re parse")
+                # Fallback: Regex on WKT
+                wkt = data.wkt
+                matches = re.findall(r'AXIS\["([^"]+)"', wkt)
+                if matches:
+                    if len(matches) >= 1: labels[0] = matches[0] + ":"
+                    if len(matches) >= 2: labels[1] = matches[1] + ":"
+                    if len(matches) >= 3: labels[2] = matches[2] + ":"
+                elif data.geogcs:
+                    labels[0] = "Longitude:"
+                    labels[1] = "Latitude:"
+                    labels[2] = "Altitude:"
+                else:
+                    labels[0] = "X (m):"
+                    labels[1] = "Y (m):"
+                    labels[2] = "Z (m):"
+        
+        self.lbl_col_x.setText(labels[0])
+        self.lbl_col_y.setText(labels[1])
+        self.lbl_col_z.setText(labels[2])
             
         self.update_table_headers()
 

@@ -40,6 +40,7 @@ dependencies = [
     "pillow>=8.2.0",
     "pybboxes>=0.1.6",
     "pymupdf>=1.26.3",
+    "pyproj>=3.6.1",
     "requests>=2.32.3",
     "shapely>=2.0.0",
     "sphinx>=7.4.7",
