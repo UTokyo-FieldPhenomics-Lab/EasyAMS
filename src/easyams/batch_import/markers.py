@@ -385,7 +385,6 @@ class BatchMarkerManager(QDialog):
 
     def apply_changes_tab1(self):
         # Gather Rules
-        # Gather Rules
         current_list_markers = set()
         for i in range(self.marker_list.count()):
             item = self.marker_list.item(i)
@@ -475,88 +474,132 @@ class BatchMarkerManager(QDialog):
         self.refresh_tree_data() # Easiest way to clear visual artifacts
         QMessageBox.information(self, "Reset", "All pending changes cleared.")
 
-    # --- Tab 3: Import Reference ---
+    # --- Tab 2: Import Reference (formerly Tab 3) ---
     def init_tab2_ui(self):
         self.tab2 = QWidget()
         layout = QVBoxLayout()
         self.tab2.setLayout(layout)
         
-        # 1. Coordinate System
+        # 1. File Browse (Top)
+        file_layout = QHBoxLayout()
+        self.lbl_csv_path = QLabel("No file selected")
+        self.lbl_csv_path.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        self.lbl_csv_path.setStyleSheet("background-color: white;")
+        self.btn_browse_csv = QPushButton("...")
+        self.btn_browse_csv.setFixedSize(30, 25)
+        self.btn_browse_csv.clicked.connect(self.browse_csv_file)
+        
+        file_layout.addWidget(self.lbl_csv_path, 1) # Label takes available space
+        file_layout.addWidget(self.btn_browse_csv)
+        layout.addLayout(file_layout)
+
+        # 2. Coordinate System
         crs_group = QGroupBox("Coordinate System")
         crs_layout = QVBoxLayout()
-        
         self.combo_crs = QComboBox()
+        self.populate_crs_options()
         self.combo_crs.currentIndexChanged.connect(self.on_crs_changed)
         crs_layout.addWidget(self.combo_crs)
-        
         crs_group.setLayout(crs_layout)
         layout.addWidget(crs_group)
-        
-        # 2. File Selection
-        file_layout = QHBoxLayout()
-        self.label_csv_path = QLabel("No file selected")
-        btn_browse_csv = QPushButton("Browse CSV...")
-        btn_browse_csv.clicked.connect(self.browse_csv_file)
-        
-        file_layout.addWidget(btn_browse_csv)
-        file_layout.addWidget(self.label_csv_path)
-        layout.addLayout(file_layout)
-        
-        # 3. Columns Mapping
-        columns_group = QGroupBox("Columns")
-        columns_layout = QGridLayout()
-        
-        # Headers/SpinBoxes
-        self.spin_col_label = QSpinBox()
-        self.spin_col_x = QSpinBox()
-        self.spin_col_y = QSpinBox()
-        self.spin_col_z = QSpinBox()
-        self.spin_col_acc = QSpinBox()
-        
-        # Defaults
-        self.spin_col_label.setValue(1)
-        self.spin_col_x.setValue(2)
-        self.spin_col_y.setValue(3)
-        self.spin_col_z.setValue(4)
-        self.spin_col_acc.setValue(5)
-        
-        # Labels (Dynamic)
-        self.label_x_title = QLabel("X/Long:")
-        self.label_y_title = QLabel("Y/Lat:")
-        self.label_z_title = QLabel("Z/Alt:")
-        
-        columns_layout.addWidget(QLabel("Label:"), 0, 0)
-        columns_layout.addWidget(self.spin_col_label, 0, 1)
-        
-        self.cb_acc = QCheckBox("Accuracy")
-        columns_layout.addWidget(self.cb_acc, 0, 2)
-        columns_layout.addWidget(self.spin_col_acc, 0, 3)
-        
-        columns_layout.addWidget(self.label_x_title, 1, 0)
-        columns_layout.addWidget(self.spin_col_x, 1, 1)
-        
-        columns_layout.addWidget(self.label_y_title, 1, 2)
-        columns_layout.addWidget(self.spin_col_y, 1, 3)
-        
-        columns_layout.addWidget(self.label_z_title, 1, 4)
-        columns_layout.addWidget(self.spin_col_z, 1, 5)
-        
-        # Start Row
-        columns_layout.addWidget(QLabel("Start Row:"), 2, 0)
-        self.spin_start_row = QSpinBox()
-        self.spin_start_row.setValue(2) # Default skip header
-        self.spin_start_row.setMinimum(1)
-        columns_layout.addWidget(self.spin_start_row, 2, 1)
-        
-        columns_group.setLayout(columns_layout)
-        layout.addWidget(columns_group)
 
+        # 3. Columns Mapping
+        col_group = QGroupBox("Columns")
+        self.columns_layout = QGridLayout()
+        
+        # Row 0: Label
+        self.columns_layout.addWidget(QLabel("Label:"), 0, 0)
+        self.spin_col_label = QSpinBox()
+        self.spin_col_label.setRange(1, 99)
+        self.spin_col_label.valueChanged.connect(self.update_table_headers)
+        self.columns_layout.addWidget(self.spin_col_label, 0, 1)
+        
+        self.chk_accuracy = QCheckBox("Accuracy")
+        self.chk_accuracy.stateChanged.connect(self.toggle_accuracy_input)
+        self.columns_layout.addWidget(self.chk_accuracy, 0, 2)
+
+        # Row 1: X / Longitude
+        self.lbl_col_x = QLabel("Longitude:")
+        self.columns_layout.addWidget(self.lbl_col_x, 1, 0)
+        self.spin_col_x = QSpinBox()
+        self.spin_col_x.setRange(1, 99)
+        self.spin_col_x.setValue(2)
+        self.spin_col_x.valueChanged.connect(self.update_table_headers)
+        self.columns_layout.addWidget(self.spin_col_x, 1, 1)
+        
+        self.spin_prec_x = QSpinBox()
+        self.spin_prec_x.setRange(0, 15)
+        self.spin_prec_x.setValue(8) # Default precision
+        self.spin_prec_x.setToolTip("Decimal places")
+        self.columns_layout.addWidget(self.spin_prec_x, 1, 2)
+
+        # Row 2: Y / Latitude
+        self.lbl_col_y = QLabel("Latitude:")
+        self.columns_layout.addWidget(self.lbl_col_y, 2, 0)
+        self.spin_col_y = QSpinBox()
+        self.spin_col_y.setRange(1, 99)
+        self.spin_col_y.setValue(3)
+        self.spin_col_y.valueChanged.connect(self.update_table_headers)
+        self.columns_layout.addWidget(self.spin_col_y, 2, 1)
+        
+        self.spin_prec_y = QSpinBox()
+        self.spin_prec_y.setRange(0, 15)
+        self.spin_prec_y.setValue(8)
+        self.columns_layout.addWidget(self.spin_prec_y, 2, 2)
+
+        # Row 3: Z / Altitude
+        self.lbl_col_z = QLabel("Altitude:")
+        self.columns_layout.addWidget(self.lbl_col_z, 3, 0)
+        self.spin_col_z = QSpinBox()
+        self.spin_col_z.setRange(1, 99)
+        self.spin_col_z.setValue(4)
+        self.spin_col_z.valueChanged.connect(self.update_table_headers)
+        self.columns_layout.addWidget(self.spin_col_z, 3, 1)
+        
+        self.spin_prec_z = QSpinBox()
+        self.spin_prec_z.setRange(0, 15)
+        self.spin_prec_z.setValue(8)
+        self.columns_layout.addWidget(self.spin_prec_z, 3, 2)
+        
+        # Row 4: Accuracy Column (Initially Hidden)
+        self.lbl_col_acc = QLabel("Accuracy Col:")
+        self.spin_col_acc = QSpinBox()
+        self.spin_col_acc.setRange(1, 99)
+        self.spin_col_acc.setValue(5)
+        # Add to layout but hide? Or just let toggle handle it?
+        # Let's add it to row 4
+        self.columns_layout.addWidget(self.lbl_col_acc, 4, 0)
+        self.columns_layout.addWidget(self.spin_col_acc, 4, 1)
+        self.lbl_col_acc.setVisible(False)
+        self.spin_col_acc.setVisible(False)
+
+        # Row 5: Start Row - Move to separate bottom area or keep in grid?
+        # User Fig 1 doesn't show Start Row. But we need it.
+        # Let's put it at the bottom.
+        
+        col_group.setLayout(self.columns_layout)
+        layout.addWidget(col_group)
+        
+        # Start Row separate
+        row_layout = QHBoxLayout()
+        row_layout.addWidget(QLabel("Start Row:"))
+        self.spin_start_row = QSpinBox()
+        self.spin_start_row.setValue(1) 
+        self.spin_start_row.setMinimum(1)
+        self.spin_start_row.valueChanged.connect(self.update_table_headers) # Might affect data but not headers mapping.
+        # But reloading preview might be needed.
+        self.spin_start_row.valueChanged.connect(self.load_csv_preview)
+        row_layout.addWidget(self.spin_start_row)
+        row_layout.addStretch()
+        layout.addLayout(row_layout)
+        
         # 4. Preview Table
         layout.addWidget(QLabel("First 20 lines preview:"))
         self.table_preview = QTableWidget()
-        self.table_preview.setColumnCount(5) # Init default
-        layout.addWidget(self.table_preview)
-        
+        self.table_preview.setRowCount(0)
+        self.table_preview.setColumnCount(0)
+        self.table_preview.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table_preview.verticalHeader().setVisible(True) # Show row numbers
         layout.addWidget(self.table_preview)
         
         # Actions
@@ -569,116 +612,131 @@ class BatchMarkerManager(QDialog):
         action_layout.addWidget(self.btn_import_reset)
         action_layout.addWidget(self.btn_import_apply)
         layout.addLayout(action_layout)
-        
-        # Connect signals for preview update
-        self.spin_start_row.valueChanged.connect(self.update_csv_preview_highlight)
-        self.spin_col_label.valueChanged.connect(self.update_csv_preview_highlight)
-        self.spin_col_x.valueChanged.connect(self.update_csv_preview_highlight)
-        self.spin_col_y.valueChanged.connect(self.update_csv_preview_highlight)
-        self.spin_col_z.valueChanged.connect(self.update_csv_preview_highlight)
 
-        # Init CRS options
-        self.populate_crs_options()
+    def toggle_accuracy_input(self, state):
+        visible = (state == Qt.Checked)
+        self.lbl_col_acc.setVisible(visible)
+        self.spin_col_acc.setVisible(visible)
+
+    def update_table_headers(self):
+        # Update dynamic headers based on spinbox values
+        cols = self.table_preview.columnCount()
+        if cols == 0: return
+
+        # Default headers
+        headers = [str(i+1) for i in range(cols)]
+        
+        # Map indices to names
+        # Spinboxes are 1-based, list is 0-based
+        mapping = {
+            self.spin_col_label.value() - 1: "Label",
+            self.spin_col_x.value() - 1: self.lbl_col_x.text().replace(":", ""),
+            self.spin_col_y.value() - 1: self.lbl_col_y.text().replace(":", ""),
+            self.spin_col_z.value() - 1: "Altitude",
+        }
+        
+        if self.chk_accuracy.isChecked():
+            mapping[self.spin_col_acc.value() - 1] = "Accuracy"
+
+        for idx, name in mapping.items():
+            if 0 <= idx < cols:
+                headers[idx] = name
+        
+        self.table_preview.setHorizontalHeaderLabels(headers)
 
     def populate_crs_options(self):
         self.combo_crs.clear()
         
-        # 1. Current Active Chunk CRS (Default)
-        doc = Metashape.app.document
-        if doc.chunk and doc.chunk.crs:
-            self.add_crs_to_combo(doc.chunk.crs, "Active Chunk")
+        # 1. Active Chunk CRS
+        active_chunk = Metashape.app.document.chunk
+        if active_chunk and active_chunk.crs:
+            self.combo_crs.addItem(f"Active: {active_chunk.crs.name}", active_chunk.crs)
         
-        # 2. Presets
-        self.combo_crs.addItem("Local Coordinates (m)", "Local")
-        self.combo_crs.addItem("WGS 84 (EPSG::4326)", "EPSG::4326")
+        # 2. Local
+        self.combo_crs.addItem("Local Coordinates (m)", None)
         
-        # 3. All Chunks CRS
+        # 3. WGS 84
+        self.combo_crs.addItem("WGS 84 (EPSG::4326)", Metashape.CoordinateSystem("EPSG::4326"))
+        
+        # 4. Other chunks CRSs
         seen_crs = set()
-        if doc.chunk and doc.chunk.crs: seen_crs.add(str(doc.chunk.crs))
+        if active_chunk and active_chunk.crs: seen_crs.add(active_chunk.crs.name)
+        seen_crs.add("EPSG::4326")
         
-        for chunk in doc.chunks:
-            if chunk.crs and str(chunk.crs) not in seen_crs:
-                self.add_crs_to_combo(chunk.crs, f"Chunk: {chunk.label}")
-                seen_crs.add(str(chunk.crs))
+        for chunk in Metashape.app.document.chunks:
+            if chunk.crs and chunk.crs.name not in seen_crs:
+                self.combo_crs.addItem(chunk.crs.name, chunk.crs)
+                seen_crs.add(chunk.crs.name)
                 
-        # 4. More...
+        # 5. More...
         self.combo_crs.addItem("More...", "MORE")
-
-    def add_crs_to_combo(self, crs, label_prefix=""):
-        # Helper to format decent label
-        auth = crs.authority
-        name = crs.name
-        full_label = f"{name}"
-        if auth: full_label += f" ({auth})"
-        if label_prefix: full_label = f"[{label_prefix}] {full_label}"
-        
-        self.combo_crs.addItem(full_label, crs) # Store crs object as user data
 
     def on_crs_changed(self, index):
         data = self.combo_crs.itemData(index)
-        
         if data == "MORE":
-             # Open Metashape dialog
-             new_crs = Metashape.app.getCoordinateSystem("Select Coordinate System")
-             if new_crs:
-                 self.add_crs_to_combo(new_crs, "User Selected")
-                 self.combo_crs.setCurrentIndex(self.combo_crs.count() - 1)
-                 data = new_crs
-             else:
-                 # Revert to valid? or stay? 
-                 pass
-        
-        # Update Labels
-        if isinstance(data, Metashape.CoordinateSystem):
-            # Check if geographic (no direct isGeographic prop in simple API, check proj4 or geogcs)
-             is_geo = "long" in data.wkt.lower() or "lat" in data.wkt.lower()
-             if is_geo:
-                 self.label_x_title.setText("Longitude:")
-                 self.label_y_title.setText("Latitude:")
-                 self.label_z_title.setText("Altitude:")
-             else:
-                 self.label_x_title.setText("Easting (X):")
-                 self.label_y_title.setText("Northing (Y):")
-                 self.label_z_title.setText("Altitude (Z):")
-        elif data == "Local":
-             self.label_x_title.setText("X (m):")
-             self.label_y_title.setText("Y (m):")
-             self.label_z_title.setText("Z (m):")
-        elif data == "EPSG::4326":
-             self.label_x_title.setText("Longitude:")
-             self.label_y_title.setText("Latitude:")
-             self.label_z_title.setText("Altitude:")
-    
-    def browse_csv_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select CSV", "", "CSV Files (*.csv);;All Files (*)")
-        if path:
-            self.csv_path = path
-            self.label_csv_path.setText(os.path.basename(path))
-            self.load_csv_preview()
+            crs = Metashape.app.getCoordinateSystem()
+            if crs:
+                # Add and select
+                self.combo_crs.insertItem(self.combo_crs.count()-1, crs.name, crs)
+                self.combo_crs.setCurrentIndex(self.combo_crs.count()-2)
+                data = crs
+            else:
+                 # Revert to previous valid? Or just select index 0?
+                 self.combo_crs.setCurrentIndex(0)
+                 return
 
-    def load_csv_preview(self):
-        if not hasattr(self, 'csv_path'): return
-        
+        # Update labels
+        is_geo = False
+        if isinstance(data, Metashape.CoordinateSystem):
+            if data.geogcs: is_geo = True
+            
+        if is_geo:
+            self.lbl_col_x.setText("Longitude:")
+            self.lbl_col_y.setText("Latitude:")
+        else:
+            self.lbl_col_x.setText("Easting (m):")
+            self.lbl_col_y.setText("Northing (m):")
+            
+        self.update_table_headers()
+
+    def browse_csv_file(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open CSV", "", "CSV Files (*.csv *.txt)")
+        if path:
+            self.lbl_csv_path.setText(path)
+            self.load_csv_preview(path)
+
+    def load_csv_preview(self, path=None):
+        if not path:
+            path = self.lbl_csv_path.text()
+            if not os.path.exists(path): return
+
         try:
-            with open(self.csv_path, 'r', encoding='utf-8') as f:
-                # Read first 20 lines
-                lines = [line.strip() for line in f if line.strip()]
-                preview_lines = lines[:20]
-                
-            if not preview_lines: return
+            with open(path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                rows = []
+                # Skip rows logic? 
+                # Start Row in UI is 1-based index of DATA start.
+                # But preview usually shows file content raw.
+                # Let's show first 20 lines RAW.
+                for _ in range(20):
+                    try:
+                        row = next(reader)
+                        rows.append(row)
+                    except StopIteration:
+                        break
             
-            # Detect cols from first line logic (comma)
-            cols_count = len(preview_lines[0].split(','))
-            self.table_preview.setColumnCount(cols_count)
-            self.table_preview.setRowCount(len(preview_lines))
+            if not rows: return
             
-            for r, line in enumerate(preview_lines):
-                parts = line.split(',')
-                for c, text in enumerate(parts):
-                    if c < cols_count:
-                        self.table_preview.setItem(r, c, QTableWidgetItem(text))
+            # Setup table
+            max_cols = max(len(r) for r in rows)
+            self.table_preview.setColumnCount(max_cols)
+            self.table_preview.setRowCount(len(rows))
             
-            self.update_csv_preview_highlight()
+            for r_idx, row in enumerate(rows):
+                for c_idx, val in enumerate(row):
+                    self.table_preview.setItem(r_idx, c_idx, QTableWidgetItem(val))
+            
+            self.update_table_headers()
             
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to read CSV: {e}")
@@ -688,105 +746,109 @@ class BatchMarkerManager(QDialog):
         self.spin_col_x.setValue(2)
         self.spin_col_y.setValue(3)
         self.spin_col_z.setValue(4)
-        self.spin_col_acc.setValue(5)
-        self.cb_acc.setChecked(False)
-        self.spin_start_row.setValue(2)
-        self.combo_crs.setCurrentIndex(0) # Default to first (Active Chunk)
-        self.label_csv_path.setText("No file selected")
-        if hasattr(self, 'csv_path'): del self.csv_path
-        self.table_preview.clearContents()
+        self.spin_prec_x.setValue(8)
+        self.spin_prec_y.setValue(8)
+        self.spin_prec_z.setValue(8)
+        self.chk_accuracy.setChecked(False)
+        self.spin_start_row.setValue(1)
+        self.lbl_csv_path.setText("No file selected")
+        self.table_preview.clear()
         self.table_preview.setRowCount(0)
-
-    def update_csv_preview_highlight(self):
-        # Todo: Highlight columns used for X, Y, Z, Label background color
-        # This is purely visual
-        pass
+        self.table_preview.setColumnCount(0)
+        # Helper: Reset Combo?
+        self.combo_crs.setCurrentIndex(0)
 
     def apply_import_reference(self):
-        if not hasattr(self, 'csv_path'): 
-            QMessageBox.warning(self, "Error", "Please select a CSV file first.")
+        csv_path = self.lbl_csv_path.text()
+        if not os.path.exists(csv_path):
+            QMessageBox.warning(self, "Error", "Please select a valid CSV file.")
             return
-
-        # Get Selected CRS
-        idx = self.combo_crs.currentIndex()
-        crs_data = self.combo_crs.itemData(idx)
+            
+        target_crs = self.combo_crs.currentData()
+        if target_crs == "MORE": return # Should not happen
         
-        target_crs = None
-        if isinstance(crs_data, Metashape.CoordinateSystem):
-            target_crs = crs_data
-        elif crs_data == "EPSG::4326":
-            target_crs = Metashape.CoordinateSystem("EPSG::4326")
-        elif crs_data == "Local":
-            target_crs = None # None implies Local in some contexts? Or we just clear crs.
-            # Usually Metashape.CoordinateSystem can be None for strict local, or constructed local.
-            # If target_crs is None, we set chunk.crs = None? No, better to keep it None.
+        # Get mapping (0-based)
+        idx_label = self.spin_col_label.value() - 1
+        idx_x = self.spin_col_x.value() - 1
+        idx_y = self.spin_col_y.value() - 1
+        idx_z = self.spin_col_z.value() - 1
+        idx_acc = self.spin_col_acc.value() - 1 if self.chk_accuracy.isChecked() else -1
         
-        # Get Column Mapping (1-based index from UI -> 0-based for list)
-        col_label = self.spin_col_label.value() - 1
-        col_x = self.spin_col_x.value() - 1
-        col_y = self.spin_col_y.value() - 1
-        col_z = self.spin_col_z.value() - 1
-        col_acc = self.spin_col_acc.value() - 1
-        use_acc = self.cb_acc.isChecked()
-        start_row = self.spin_start_row.value() - 1 # 0-indexed logic
+        prec_x = self.spin_prec_x.value()
+        prec_y = self.spin_prec_y.value()
+        prec_z = self.spin_prec_z.value()
         
-        # Read All Data
-        marker_data = {} # Label -> {loc: Vector, acc: float}
-        with open(self.csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f) # Default comma
-            for i, row in enumerate(reader):
-                if i < start_row: continue
-                if not row: continue
-                
-                try:
-                    label = row[col_label].strip()
-                    x = float(row[col_x])
-                    y = float(row[col_y])
-                    z = float(row[col_z])
+        start_row = self.spin_start_row.value() # 1-based
+        
+        marker_data = {} # label -> (Vector, accuracy)
+        
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                for i, row in enumerate(reader):
+                    if i + 1 < start_row: continue
                     
-                    data = {'loc': Metashape.Vector((x,y,z))}
-                    
-                    if use_acc and len(row) > col_acc:
-                         data['acc'] = float(row[col_acc])
-                    
-                    marker_data[label] = data
-                except (ValueError, IndexError):
-                    continue
-
-        # Apply to Chunks
+                    try:
+                        label = row[idx_label].strip()
+                        # Apply precision rounding
+                        x = round(float(row[idx_x]), prec_x)
+                        y = round(float(row[idx_y]), prec_y)
+                        z = round(float(row[idx_z]), prec_z)
+                        
+                        acc = None
+                        if idx_acc >= 0 and idx_acc < len(row):
+                            try:
+                                acc = float(row[idx_acc])
+                            except: pass
+                            
+                        marker_data[label] = (Metashape.Vector([x, y, z]), acc)
+                    except (IndexError, ValueError) as e:
+                        # Skip bad lines
+                        pass
+                        
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to process CSV: {e}")
+            return
+            
+        if not marker_data:
+            QMessageBox.warning(self, "Warning", "No valid marker data found.")
+            return
+            
+        # Apply to selected chunks
         root = self.tree.invisibleRootItem()
         modified_chunks = 0
         
         for i in range(root.childCount()):
             chunk_item = root.child(i)
-            if chunk_item.checkState(0) != Qt.Checked:
-                continue
+            if chunk_item.checkState(0) != Qt.Checked: continue
             
             chunk_key = chunk_item.data(0, Qt.UserRole)
             chunk = next((c for c in Metashape.app.document.chunks if c.key == chunk_key), None)
             if not chunk: continue
             
-            # Update Chunk CRS
+            # 1. Update CRS
             if target_crs:
                 chunk.crs = target_crs
             else:
-                chunk.crs = None # Local?
-            
-            chunk_modified = False
+                # Local
+                pass # Usually we don't set to None unless explicitly wanted
+                
+            # 2. Update Markers
+            count = 0
             for marker in chunk.markers:
                 if marker.label in marker_data:
-                    info = marker_data[marker.label]
-                    marker.reference.location = info['loc']
-                    if 'acc' in info:
-                        marker.reference.accuracy = info['acc']
+                    coords, accuracy = marker_data[marker.label]
+                    marker.reference.location = coords
+                    if accuracy is not None:
+                         marker.reference.accuracy = accuracy
                     marker.reference.enabled = True
-                    chunk_modified = True
+                    count += 1
             
-            if chunk_modified:
+            if count > 0:
                 modified_chunks += 1
-
-        self.refresh_tree_data()
+                
         QMessageBox.information(self, "Success", f"Imported reference for {len(marker_data)} markers in {modified_chunks} chunks.")
+        self.refresh_tree_data()
 
 def create_batch_marker_manager():
     app = Metashape.app
