@@ -535,6 +535,8 @@ class BatchMarkerManager(QDialog):
         self.spin_prec_x.setRange(0, 15)
         self.spin_prec_x.setValue(8) # Default precision
         self.spin_prec_x.setToolTip("Decimal places")
+        self.spin_prec_x.setEnabled(False)
+        self.spin_prec_x.valueChanged.connect(lambda: self.load_csv_preview())
         self.columns_layout.addWidget(self.spin_prec_x, 1, 2)
 
         # Row 2: Y / Latitude
@@ -549,6 +551,8 @@ class BatchMarkerManager(QDialog):
         self.spin_prec_y = QSpinBox()
         self.spin_prec_y.setRange(0, 15)
         self.spin_prec_y.setValue(8)
+        self.spin_prec_y.setEnabled(False)
+        self.spin_prec_y.valueChanged.connect(lambda: self.load_csv_preview())
         self.columns_layout.addWidget(self.spin_prec_y, 2, 2)
 
         # Row 3: Z / Altitude
@@ -563,20 +567,12 @@ class BatchMarkerManager(QDialog):
         self.spin_prec_z = QSpinBox()
         self.spin_prec_z.setRange(0, 15)
         self.spin_prec_z.setValue(8)
+        self.spin_prec_z.setEnabled(False)
+        self.spin_prec_z.valueChanged.connect(lambda: self.load_csv_preview())
         self.columns_layout.addWidget(self.spin_prec_z, 3, 2)
         
-        # Row 4: Accuracy Column (Initially Hidden)
-        self.lbl_col_acc = QLabel("Accuracy Col:")
-        self.spin_col_acc = QSpinBox()
-        self.spin_col_acc.setRange(1, 99)
-        self.spin_col_acc.setValue(5)
-        # Add to layout but hide? Or just let toggle handle it?
-        # Let's add it to row 4
-        self.columns_layout.addWidget(self.lbl_col_acc, 4, 0)
-        self.columns_layout.addWidget(self.spin_col_acc, 4, 1)
-        self.lbl_col_acc.setVisible(False)
-        self.spin_col_acc.setVisible(False)
-
+        # Row 4: Accuracy Column (Removed)
+        
         # Row 5: Start Row - Move to separate bottom area or keep in grid?
         # User Fig 1 doesn't show Start Row. But we need it.
         # Let's put it at the bottom.
@@ -592,7 +588,8 @@ class BatchMarkerManager(QDialog):
         self.spin_start_row.setMinimum(1)
         self.spin_start_row.valueChanged.connect(self.update_table_headers) # Might affect data but not headers mapping.
         # But reloading preview might be needed.
-        self.spin_start_row.valueChanged.connect(self.load_csv_preview)
+        # Check if we should block signals or just let it update
+        self.spin_start_row.valueChanged.connect(lambda: self.load_csv_preview() if self.lbl_csv_path.text() != "No file selected" else None)
         row_layout.addWidget(self.spin_start_row)
         row_layout.addStretch()
         layout.addLayout(row_layout)
@@ -616,11 +613,13 @@ class BatchMarkerManager(QDialog):
         action_layout.addWidget(self.btn_import_reset)
         action_layout.addWidget(self.btn_import_apply)
         layout.addLayout(action_layout)
-
+    
     def toggle_accuracy_input(self, state):
-        visible = (state == Qt.Checked)
-        self.lbl_col_acc.setVisible(visible)
-        self.spin_col_acc.setVisible(visible)
+        enabled = (state == Qt.Checked)
+        self.spin_prec_x.setEnabled(enabled)
+        self.spin_prec_y.setEnabled(enabled)
+        self.spin_prec_z.setEnabled(enabled)
+        self.load_csv_preview() # Refresh preview logic
 
     def update_table_headers(self):
         # Update dynamic headers based on spinbox values
@@ -638,9 +637,6 @@ class BatchMarkerManager(QDialog):
             self.spin_col_y.value() - 1: self.lbl_col_y.text().replace(":", ""),
             self.spin_col_z.value() - 1: self.lbl_col_z.text().replace(":", ""),
         }
-        
-        if self.chk_accuracy.isChecked():
-            mapping[self.spin_col_acc.value() - 1] = "Accuracy"
 
         for idx, name in mapping.items():
             if 0 <= idx < cols:
@@ -814,9 +810,31 @@ class BatchMarkerManager(QDialog):
             self.table_preview.setColumnCount(max_cols)
             self.table_preview.setRowCount(len(rows))
             
+            # Get settings for live preview
+            idx_x = self.spin_col_x.value() - 1
+            idx_y = self.spin_col_y.value() - 1
+            idx_z = self.spin_col_z.value() - 1
+            
+            show_prec = self.chk_accuracy.isChecked()
+            prec_x = self.spin_prec_x.value()
+            prec_y = self.spin_prec_y.value()
+            prec_z = self.spin_prec_z.value()
+            
             for r_idx, row in enumerate(rows):
                 for c_idx, val in enumerate(row):
-                    self.table_preview.setItem(r_idx, c_idx, QTableWidgetItem(val))
+                    display_val = val
+                    if show_prec:
+                        try:
+                            if c_idx == idx_x:
+                                display_val = f"{float(val):.{prec_x}f}"
+                            elif c_idx == idx_y:
+                                display_val = f"{float(val):.{prec_y}f}"
+                            elif c_idx == idx_z:
+                                display_val = f"{float(val):.{prec_z}f}"
+                        except ValueError:
+                            pass
+                            
+                    self.table_preview.setItem(r_idx, c_idx, QTableWidgetItem(display_val))
             
             self.update_table_headers()
             
@@ -831,7 +849,7 @@ class BatchMarkerManager(QDialog):
         self.spin_prec_x.setValue(8)
         self.spin_prec_y.setValue(8)
         self.spin_prec_z.setValue(8)
-        self.chk_accuracy.setChecked(False)
+        self.chk_accuracy.setChecked(False) # Should trigger toggle to disable
         self.spin_start_row.setValue(1)
         self.lbl_csv_path.setText("No file selected")
         self.table_preview.clear()
@@ -854,8 +872,8 @@ class BatchMarkerManager(QDialog):
         idx_x = self.spin_col_x.value() - 1
         idx_y = self.spin_col_y.value() - 1
         idx_z = self.spin_col_z.value() - 1
-        idx_acc = self.spin_col_acc.value() - 1 if self.chk_accuracy.isChecked() else -1
         
+        use_manual_acc = self.chk_accuracy.isChecked()
         prec_x = self.spin_prec_x.value()
         prec_y = self.spin_prec_y.value()
         prec_z = self.spin_prec_z.value()
@@ -872,22 +890,24 @@ class BatchMarkerManager(QDialog):
                     
                     try:
                         label = row[idx_label].strip()
-                        # Apply precision rounding
-                        x = round(float(row[idx_x]), prec_x)
-                        y = round(float(row[idx_y]), prec_y)
-                        z = round(float(row[idx_z]), prec_z)
+                        x_raw = float(row[idx_x])
+                        y_raw = float(row[idx_y])
+                        z_raw = float(row[idx_z])
                         
                         acc = None
-                        if idx_acc >= 0 and idx_acc < len(row):
-                            try:
-                                acc = float(row[idx_acc])
-                            except: pass
-                            
+                        if use_manual_acc:
+                             # Round Coords
+                             x = round(x_raw, prec_x)
+                             y = round(y_raw, prec_y)
+                             z = round(z_raw, prec_z)
+                             # Set accuracy based on precision (e.g. 3 -> 0.001)
+                             acc = Metashape.Vector([pow(10, -prec_x), pow(10, -prec_y), pow(10, -prec_z)])
+                        else:
+                             x, y, z = x_raw, y_raw, z_raw
+                             
                         marker_data[label] = (Metashape.Vector([x, y, z]), acc)
                     except (IndexError, ValueError) as e:
-                        # Skip bad lines
                         pass
-                        
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process CSV: {e}")
             return
