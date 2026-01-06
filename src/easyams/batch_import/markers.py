@@ -607,10 +607,16 @@ class BatchMarkerManager(QDialog):
         action_layout = QHBoxLayout()
         self.btn_import_reset = QPushButton("Reset")
         self.btn_import_reset.clicked.connect(self.reset_tab2)
+        
+        self.btn_preview_changes = QPushButton("Preview Changes")
+        self.btn_preview_changes.setToolTip("Show changes in tree view (Green=New, Red=Old)")
+        self.btn_preview_changes.clicked.connect(self.preview_changes_tab2)
+        
         self.btn_import_apply = QPushButton("Import Reference")
         self.btn_import_apply.clicked.connect(self.apply_import_reference)
         
         action_layout.addWidget(self.btn_import_reset)
+        action_layout.addWidget(self.btn_preview_changes)
         action_layout.addWidget(self.btn_import_apply)
         layout.addLayout(action_layout)
     
@@ -857,6 +863,82 @@ class BatchMarkerManager(QDialog):
         self.table_preview.setColumnCount(0)
         # Helper: Reset Combo?
         self.combo_crs.setCurrentIndex(0)
+        self.refresh_tree_data()
+
+    def preview_changes_tab2(self):
+        marker_data = self.parse_csv_for_reference()
+        if not marker_data: return
+        
+        root = self.tree.invisibleRootItem()
+        modified_count = 0
+        
+        # We need to know decimal precision for display
+        use_prec = self.chk_accuracy.isChecked()
+        prec_x = self.spin_prec_x.value()
+        prec_y = self.spin_prec_y.value()
+        prec_z = self.spin_prec_z.value()
+        
+        def fmt_val(v, prec):
+            if v is None: return "None"
+            if use_prec:
+                return f"{v:.{prec}f}"
+            else:
+                return f"{v}"
+        
+        for i in range(root.childCount()):
+            chunk_item = root.child(i)
+            if chunk_item.checkState(0) != Qt.Checked: continue
+            
+            chunk_key = chunk_item.data(0, Qt.UserRole)
+            chunk = next((c for c in Metashape.app.document.chunks if c.key == chunk_key), None)
+            if not chunk: continue
+            
+            updates = 0
+            for j in range(chunk_item.childCount()):
+                m_item = chunk_item.child(j)
+                m_label = m_item.data(0, Qt.UserRole)
+                if not m_label: m_label = m_item.text(0).split(" ", 1)[-1]
+                
+                if m_label in marker_data:
+                    new_loc, _ = marker_data[m_label]
+                    
+                    marker = next((m for m in chunk.markers if m.label == m_label), None)
+                    current_loc = None
+                    if marker and marker.reference.location:
+                         current_loc = marker.reference.location
+                    
+                    # Updates for X (col 1), Y (col 2), Z (col 3)
+                    # Helper for col render
+                    def render_col(col_idx, curr, new, prec):
+                        html = ""
+                        s_new = fmt_val(new, prec)
+                        if curr is None:
+                            html = f'<font color="green"><b>{s_new}</b></font>'
+                        else:
+                            s_curr = fmt_val(curr, prec)
+                            if s_curr != s_new: # Diff string representation
+                                html = f'<font color="red"><s>{s_curr}</s></font> <font color="green"><b>{s_new}</b></font>'
+                            else:
+                                html = s_curr # No change visually
+                        
+                        lbl = QLabel(html)
+                        lbl.setTextFormat(Qt.RichText)
+                        # Clear text to avoid overlap
+                        m_item.setText(col_idx, "")
+                        self.tree.setItemWidget(m_item, col_idx, lbl)
+
+                    render_col(1, current_loc.x if current_loc else None, new_loc.x, prec_x)
+                    render_col(2, current_loc.y if current_loc else None, new_loc.y, prec_y)
+                    render_col(3, current_loc.z if current_loc else None, new_loc.z, prec_z)
+                    
+                    updates += 1
+            
+            if updates > 0:
+                 modified_count += 1
+                 chunk_item.setText(0, chunk_item.text(0).split(" (", 1)[0] + f" ({updates} refs)")
+        
+        if modified_count == 0:
+            QMessageBox.information(self, "Preview", "No markers matched in selected chunks.")
 
     def apply_import_reference(self):
         csv_path = self.lbl_csv_path.text()
@@ -864,9 +946,13 @@ class BatchMarkerManager(QDialog):
             QMessageBox.warning(self, "Error", "Please select a valid CSV file.")
             return
             
-        target_crs = self.combo_crs.currentData()
-        if target_crs == "MORE": return # Should not happen
-        
+    def parse_csv_for_reference(self):
+        """Parses CSV based on current tab 2 settings. Returns dict {label: (Vector_loc, Vector_acc or None)}"""
+        csv_path = self.lbl_csv_path.text()
+        if not os.path.exists(csv_path):
+            QMessageBox.warning(self, "Error", "Please select a valid CSV file.")
+            return {}
+            
         # Get mapping (0-based)
         idx_label = self.spin_col_label.value() - 1
         idx_x = self.spin_col_x.value() - 1
@@ -900,7 +986,7 @@ class BatchMarkerManager(QDialog):
                              x = round(x_raw, prec_x)
                              y = round(y_raw, prec_y)
                              z = round(z_raw, prec_z)
-                             # Set accuracy based on precision (e.g. 3 -> 0.001)
+                             # Set accuracy
                              acc = Metashape.Vector([pow(10, -prec_x), pow(10, -prec_y), pow(10, -prec_z)])
                         else:
                              x, y, z = x_raw, y_raw, z_raw
@@ -910,11 +996,16 @@ class BatchMarkerManager(QDialog):
                         pass
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to process CSV: {e}")
-            return
+            return {}
             
-        if not marker_data:
-            QMessageBox.warning(self, "Warning", "No valid marker data found.")
-            return
+        return marker_data
+
+    def apply_import_reference(self):
+        marker_data = self.parse_csv_for_reference()
+        if not marker_data: return
+
+        target_crs = self.combo_crs.currentData()
+        if target_crs == "MORE": return
             
         # Apply to selected chunks
         root = self.tree.invisibleRootItem()
@@ -931,9 +1022,6 @@ class BatchMarkerManager(QDialog):
             # 1. Update CRS
             if target_crs:
                 chunk.crs = target_crs
-            else:
-                # Local
-                pass # Usually we don't set to None unless explicitly wanted
                 
             # 2. Update Markers
             count = 0
