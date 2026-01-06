@@ -2,7 +2,7 @@ __version__ = "0.1.7"
 
 
 from . import (
-    sahi_onnx, img_loader, ui, utils, web_api, gcp, updator, 
+    sahi_onnx, batch_import, ui, utils, web_api, gcp, updator
 )
 
 from .utils import (
@@ -15,7 +15,9 @@ system_info = SystemInfo()
 
 def add_metashape_menu():
     # img loader function
-    Metashape.app.addMenuItem("EasyAMS/Batch Import/Import RGB Images", img_loader.create_batch_image_loader)
+    Metashape.app.addMenuItem("EasyAMS/Batch Tools/Import RGB Images", batch_import.images.create_batch_image_importer)
+    Metashape.app.addMenuItem("EasyAMS/Batch Tools/Import Mask Images", batch_import.masks.create_batch_mask_importer)
+    Metashape.app.addMenuItem("EasyAMS/Batch Tools/Manage Markers", batch_import.markers.create_batch_marker_manager)
 
     # stag_gcp function
     Metashape.app.addMenuItem("EasyAMS/GCP Markers/Export Marker GPS", gcp.gps_exporter.create_gps_exporter)
@@ -30,6 +32,4 @@ def add_metashape_menu():
     Metashape.app.addMenuItem("EasyAMS/About EasyAMS", ui.show_about_dialog)
 
     # check for updates
-    ver, has_updates = updator.check_updates()
-    if has_updates:
-        Metashape.app.messageBox("EasyAMS update available, please check for updates in the menu.")
+    updator.check_updates_on_startup()
