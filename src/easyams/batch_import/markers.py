@@ -5,7 +5,8 @@ from PySide2.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                               QTabWidget, QWidget, QListWidget, QLineEdit, 
                               QTableWidget, QTableWidgetItem, QComboBox, 
                               QSpinBox, QGroupBox, QFileDialog, QMessageBox, QSplitter,
-                              QHeaderView, QAbstractItemView, QGridLayout, QFrame, QFormLayout)
+                              QHeaderView, QAbstractItemView, QGridLayout, QFrame, QFormLayout, 
+                              QListWidgetItem)
 from PySide2.QtCore import Qt
 import Metashape
 
@@ -95,7 +96,10 @@ class BatchMarkerManager(QDialog):
 
     def add_marker_node(self, parent, marker, crs):
         item = QTreeWidgetItem(parent)
-        item.setText(0, "📍 " + marker.label)
+        
+        # Icon based on enabled status
+        icon = "📍" if marker.enabled else "⛔"
+        item.setText(0, f"{icon} {marker.label}")
         
         if marker.reference.location:
             loc = marker.reference.location
@@ -180,6 +184,10 @@ class BatchMarkerManager(QDialog):
         self.input_rename_from = QLineEdit()
         self.input_rename_to = QLineEdit()
         
+        # Connect signals for real-time list update
+        self.input_rename_from.textChanged.connect(self.update_list_preview)
+        self.input_rename_to.textChanged.connect(self.update_list_preview)
+        
         rename_layout_box.addRow("Find:", self.input_rename_from)
         rename_layout_box.addRow("Replace with:", self.input_rename_to)
         
@@ -206,6 +214,46 @@ class BatchMarkerManager(QDialog):
 
         self.populate_unique_markers()
 
+    def update_list_preview(self):
+        find_str = self.input_rename_from.text()
+        replace_str = self.input_rename_to.text()
+        
+        for i in range(self.marker_list.count()):
+            item = self.marker_list.item(i)
+            # Use original from list or item text? item.text() is safe as setItemWidget doesn't change it.
+            original = item.data(Qt.UserRole)
+            if not original:
+                # Fallback if UserRole empty (e.g. legacy items or added without data locally?)
+                # If text is empty (due to previous preview), we are in trouble if we didn't store it.
+                # But we always store it in populate and add.
+                # Just in case text is present:
+                if item.text():
+                    original = item.text()
+                    item.setData(Qt.UserRole, original)
+            
+            if not original: continue # Should not happen
+
+            if find_str and find_str in original:
+                 # Logic: "A<del>find</del><ins>replace</ins>B"
+                 replacement_html = f"<span style='color:red; text-decoration:line-through;'>{find_str}</span><span style='color:green;'>{replace_str}</span>"
+                 new_html = original.replace(find_str, replacement_html)
+                 
+                 label = QLabel(new_html)
+                 # Make background white or transparent? 
+                 # Since we clear text, transparent is fine to show selection color?
+                 # But selection color might be behind.
+                 # Let's keep transparent but clear item text.
+                 label.setStyleSheet("background-color: transparent;")
+                 
+                 # IMPORTANT: Clear text to avoid double rendering (ghosting)
+                 item.setText("") 
+                 self.marker_list.setItemWidget(item, label)
+            else:
+                 # Restore
+                 if self.marker_list.itemWidget(item):
+                     self.marker_list.removeItemWidget(item)
+                 item.setText(original)
+
     def populate_unique_markers(self):
         unique_names = set()
         for chunk in self.get_all_chunks():
@@ -214,12 +262,18 @@ class BatchMarkerManager(QDialog):
         
         self.marker_list.clear()
         self.original_unique_markers = sorted(list(unique_names))
-        self.marker_list.addItems(self.original_unique_markers)
+        # Add items with UserRole data for future safety
+        for name in self.original_unique_markers:
+            item = QListWidgetItem(name)
+            item.setData(Qt.UserRole, name)
+            self.marker_list.addItem(item)
 
     def add_marker_to_list(self):
         name = self.input_add_marker.text().strip()
         if name and not self.marker_list.findItems(name, Qt.MatchExactly):
-            self.marker_list.addItem(name)
+            item = QListWidgetItem(name)
+            item.setData(Qt.UserRole, name)
+            self.marker_list.addItem(item)
             self.input_add_marker.clear()
 
     def remove_marker_from_list(self):
@@ -228,7 +282,14 @@ class BatchMarkerManager(QDialog):
 
     def preview_changes_tab1(self):
         # 1. Calculate Expected States
-        current_list_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
+        current_list_markers = set()
+        for i in range(self.marker_list.count()):
+            item = self.marker_list.item(i)
+            # Prefer UserRole data as text might be just display or unchanged
+            val = item.data(Qt.UserRole)
+            if not val: val = item.text()
+            current_list_markers.add(val)
+            
         original_markers = set(self.original_unique_markers)
         
         # Deletions: In original but NOT in list
@@ -254,52 +315,83 @@ class BatchMarkerManager(QDialog):
         for i in range(root.childCount()):
             chunk_item = root.child(i)
             
+            # Stats Counters
+            count_add = 0
+            count_del = 0
+            count_ren = 0
+            
             # Reset existing styles & clean names
             for j in range(chunk_item.childCount()):
                 child = chunk_item.child(j)
                 text = child.text(0)
                 # Parse raw name
-                raw_name = text.replace("📍 ", "").replace("➕ ", "").split(" -> ")[0].strip()
-                
-                # Restore base state
-                child.setText(0, f"📍 {raw_name}")
-                child.setForeground(0, Qt.black)
-                font = child.font(0)
-                font.setStrikeOut(False)
-                child.setFont(0, font)
+                raw_name = text.replace("📍 ", "").replace("⛔ ", "").replace("➕ ", "").split(" -> ")[0].strip()
                 
                 # Check status
                 if raw_name in to_delete:
+                    child.setText(0, f"⛔ {raw_name}") # Keep icon consistent or use delete style? User said red strike
                     child.setForeground(0, Qt.red)
-                    font.setStrikeOut(True)
-                    child.setFont(0, font)
+                    font = child.font(0); font.setStrikeOut(True); child.setFont(0, font)
+                    count_del += 1
                 elif raw_name in to_rename:
                     # Rename Preview style
                     new_name = to_rename[raw_name]
-                    child.setText(0, f"📍 {raw_name} -> {new_name}")
-                    child.setForeground(0, Qt.blue) # Use Blue to signify modification
-                    font.setStrikeOut(False)
-                    child.setFont(0, font)
+                    # Icon?
+                    child.setText(0, f"📍 {raw_name} -> {new_name}") # Assuming enabled
+                    child.setForeground(0, Qt.blue)
+                    font = child.font(0); font.setStrikeOut(False); child.setFont(0, font)
+                    count_ren += 1
+                else:
+                    # Restore base
+                    # We don't know enabled status here easily without looking up marker object again
+                    # But we can assume blue square for simplicity or parse previous?
+                    # Let's just use Blue square default as we are resetting.
+                    # Or better: check if we can store marker ref in item? No, PySide crashes sometimes.
+                    # Let's just leave it as is if it looks normal, or reset to standard.
+                    if "⛔ " in text and raw_name not in to_delete:
+                         child.setText(0, f"⛔ {raw_name}") # Restore disabled icon if it was there
+                         child.setForeground(0, Qt.gray) # Disabled style often gray? Or black.
+                    else:
+                         child.setText(0, f"📍 {raw_name}")
+                         child.setForeground(0, Qt.black)
+                    font = child.font(0); font.setStrikeOut(False); child.setFont(0, font)
 
-            # Additions Preview (Avoid duplicates)
+            # Additions Preview
             current_child_names = set()
             for j in range(chunk_item.childCount()):
-                raw = chunk_item.child(j).text(0).replace("📍 ", "").replace("➕ ", "").split(" -> ")[0].strip()
+                raw = chunk_item.child(j).text(0).replace("📍 ", "").replace("⛔ ", "").replace("➕ ", "").split(" -> ")[0].strip()
                 current_child_names.add(raw)
                 
             for new_marker in to_add:
-                 # Check if this addition is also affected by rename??
-                 # Usually Add -> Rename is sequential. 
-                 # Here we assume Add is final name.
                  if new_marker not in current_child_names:
                      item = QTreeWidgetItem(chunk_item)
                      item.setText(0, f"➕ {new_marker}")
                      item.setForeground(0, Qt.green)
                      for col in range(1, 7): item.setText(col, "-")
+                     count_add += 1
+            
+            # Update Chunk Label with Stats
+            base_label = chunk_item.text(0).split(" (")[0]
+            stats_str = ""
+            stats_parts = []
+            if count_add > 0: stats_parts.append(f"+{count_add}")
+            if count_del > 0: stats_parts.append(f"-{count_del}")
+            if count_ren > 0: stats_parts.append(f"${count_ren}")
+            
+            if stats_parts:
+                stats_str = f" ({', '.join(stats_parts)})"
+            
+            chunk_item.setText(0, f"{base_label}{stats_str}")
 
     def apply_changes_tab1(self):
         # Gather Rules
-        current_list_markers = set(self.marker_list.item(i).text() for i in range(self.marker_list.count()))
+        # Gather Rules
+        current_list_markers = set()
+        for i in range(self.marker_list.count()):
+            item = self.marker_list.item(i)
+            val = item.data(Qt.UserRole)
+            if not val: val = item.text()
+            if val: current_list_markers.add(val)
         original_markers = set(self.original_unique_markers)
         
         to_delete = original_markers - current_list_markers
