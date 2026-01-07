@@ -5,6 +5,7 @@ from PySide2.QtWidgets import (QWidget, QApplication, QVBoxLayout, QHBoxLayout, 
 from PySide2.QtCore import Qt, Signal
 from PySide2.QtGui import QColor, QBrush
 import Metashape
+from PIL import Image
 
 class BatchMaskLoader(QDialog):
     def __init__(self, parent=None):
@@ -246,50 +247,84 @@ class BatchMaskLoader(QDialog):
             self.import_btn.setEnabled(True)
 
     def scan_masks(self):
-        """Recursively scan folders for mask images"""
-        self.mask_map = {}
+        """Recursively scan folders for mask images.
+        
+        Stores list of candidates per stem to handle duplicates in different folders.
+        """
+        self.mask_map = {}  # {stem: [mask_info_list]}
         for root, dirs, files in os.walk(self.root_path):
             for f in files:
                 if f.lower().endswith(self.mask_exts):
                     stem = os.path.splitext(f)[0]
-                    # If duplicate names exist, last one wins or we warn? 
-                    # User said "Image Name as unique id". Assuming uniqueness.
-                    self.mask_map[stem] = {
+                    mask_info = {
                         'path': os.path.join(root, f),
                         'dir': root,
                         'ext': os.path.splitext(f)[1]
                     }
+                    if stem not in self.mask_map:
+                        self.mask_map[stem] = []
+                    self.mask_map[stem].append(mask_info)
 
     def match_masks(self):
-        """Match scanned masks to tree items"""
+        """Match scanned masks to tree items.
+        
+        For each camera, find a mask with matching stem AND resolution.
+        If multiple candidates exist, select the first one with correct resolution.
+        """
+        doc = Metashape.app.document
+        
+        # Build camera key -> camera object map for resolution lookup
+        camera_map = {}
+        for chunk in doc.chunks:
+            for camera in chunk.cameras:
+                camera_map[camera.key] = camera
+        
         iterator = QTreeWidgetItemIterator(self.tree_widget)
         while iterator.value():
             item = iterator.value()
             if item.data(0, Qt.UserRole + 99) == "image":
                 cam_label = item.data(0, Qt.UserRole + 10)
-                # Metashape camera labels often include extension (e.g. "DSC01.JPG")
-                # We strictly match by STEM.
+                cam_key = item.data(0, Qt.UserRole)
                 cam_stem = os.path.splitext(cam_label)[0]
                 
-                # Check match
+                # Check if any mask candidates exist for this stem
                 if cam_stem in self.mask_map:
-                    # Matched
-                    mask_info = self.mask_map[cam_stem]
-                    item.setText(0, f"🖼 {cam_label} (matched)")
-                    item.setForeground(0, QBrush(QColor("black")))
-                    item.setData(0, Qt.UserRole + 20, mask_info) # Store mask info
+                    candidates = self.mask_map[cam_stem]
+                    camera = camera_map.get(cam_key)
+                    
+                    if camera and camera.sensor:
+                        cam_width = camera.sensor.width
+                        cam_height = camera.sensor.height
+                        
+                        # Find first candidate with matching resolution
+                        matched_mask = None
+                        for mask_info in candidates:
+                            try:
+                                with Image.open(mask_info['path']) as mask_img:
+                                    mask_width, mask_height = mask_img.size
+                                if cam_width == mask_width and cam_height == mask_height:
+                                    matched_mask = mask_info
+                                    break
+                            except Exception:
+                                continue
+                        
+                        if matched_mask:
+                            item.setText(0, f"🖼 {cam_label} (matched)")
+                            item.setForeground(0, QBrush(QColor("green")))
+                            item.setData(0, Qt.UserRole + 20, matched_mask)
+                        else:
+                            # Found candidates but none match resolution
+                            item.setText(0, f"🖼 {cam_label} (resolution mismatch)")
+                            item.setForeground(0, QBrush(QColor("red")))
+                            item.setData(0, Qt.UserRole + 20, None)
+                    else:
+                        # No sensor info, use first candidate
+                        item.setText(0, f"🖼 {cam_label} (matched)")
+                        item.setForeground(0, QBrush(QColor("green")))
+                        item.setData(0, Qt.UserRole + 20, candidates[0])
                 else:
-                    # Missing
-                    # item.setText(0, f"🖼 {cam_label}") 
-                    # User: "if missing, the full image name become red, (missing) stay black"
-                    # NOTE: QTreeWidgetItem color applies to the whole column text usually.
-                    # QTreeWidget doesn't support partial coloring easily. 
-                    # We will color the whole line red as a compromise, or use HTML?
-                    # QTreeWidget items standardly don't render HTML unless a delegate is set or RichText flag?
-                    # But setText usually treats as plain text. 
-                    # Let's try coloring the whole item red as originally planned/implemented, 
-                    # but append (missing).
-                    item.setText(0, f"🖼 {cam_label} (missing)") 
+                    # No mask found for this stem
+                    item.setText(0, f"🖼 {cam_label} (missing)")
                     item.setForeground(0, QBrush(QColor("red")))
                     item.setData(0, Qt.UserRole + 20, None)
             
@@ -391,17 +426,31 @@ class BatchMaskLoader(QDialog):
                         # So they are direct children. If Chunk is Checked/Partial, we usually include them.
                         pass
                     
-                    # Match Mask
-                    # Use stem lookup
+                    # Match Mask - find candidate with matching resolution
                     cam_stem = os.path.splitext(camera.label)[0]
                     if cam_stem in self.mask_map:
-                        mask_info = self.mask_map[cam_stem]
-                        path_key = (mask_info['dir'], mask_info['ext'])
+                        candidates = self.mask_map[cam_stem]
+                        cam_width = camera.sensor.width
+                        cam_height = camera.sensor.height
                         
-                        if path_key not in import_groups:
-                            import_groups[path_key] = []
-                        import_groups[path_key].append(camera)
-                        tasks_count += 1
+                        # Find first candidate with matching resolution
+                        matched_mask = None
+                        for mask_info in candidates:
+                            try:
+                                with Image.open(mask_info['path']) as mask_img:
+                                    mask_width, mask_height = mask_img.size
+                                if cam_width == mask_width and cam_height == mask_height:
+                                    matched_mask = mask_info
+                                    break
+                            except Exception:
+                                continue
+                        
+                        if matched_mask:
+                            path_key = (matched_mask['dir'], matched_mask['ext'])
+                            if path_key not in import_groups:
+                                import_groups[path_key] = []
+                            import_groups[path_key].append(camera)
+                            tasks_count += 1
             
             # Execute Imports
             if tasks_count == 0:
@@ -463,7 +512,8 @@ class BatchMaskLoader(QDialog):
             self._recursive_check(item, state)
 
     def _recursive_check(self, item, state):
-        item.setCheckState(0, state)
+        if item.flags() & Qt.ItemIsUserCheckable:
+            item.setCheckState(0, state)
         for i in range(item.childCount()):
             self._recursive_check(item.child(i), state)
 
