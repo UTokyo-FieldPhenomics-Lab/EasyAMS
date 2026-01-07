@@ -270,15 +270,66 @@ class BatchMaskLoader(QDialog):
         
         For each camera, find a mask with matching stem AND resolution.
         If multiple candidates exist, select the first one with correct resolution.
+        Results are cached in self.camera_match_cache for use during import.
         """
         doc = Metashape.app.document
+        
+        # Cache: {(chunk_key, camera_key): mask_info} for ALL cameras
+        # Using composite key because camera.key is only unique within a chunk
+        self.camera_match_cache = {}
         
         # Build camera key -> camera object map for resolution lookup
         camera_map = {}
         for chunk in doc.chunks:
             for camera in chunk.cameras:
                 camera_map[camera.key] = camera
+                
+                # Pre-match ALL cameras (not just displayed ones)
+                cam_stem = os.path.splitext(camera.label)[0]
+                if cam_stem in self.mask_map:
+                    candidates = self.mask_map[cam_stem]
+                    if camera.sensor:
+                        cam_width = camera.sensor.width
+                        cam_height = camera.sensor.height
+                        
+                        # Build context labels for path matching priority
+                        context_labels = [chunk.label]
+                        if camera.group:
+                            context_labels.append(camera.group.label)
+                        
+                        # First pass: find candidates matching resolution AND path context
+                        matched_mask = None
+                        for mask_info in candidates:
+                            try:
+                                with Image.open(mask_info['path']) as mask_img:
+                                    mask_width, mask_height = mask_img.size
+                                if cam_width == mask_width and cam_height == mask_height:
+                                    # Check if path contains chunk/group label
+                                    path_matches_context = any(
+                                        label in mask_info['path'] for label in context_labels
+                                    )
+                                    if path_matches_context:
+                                        matched_mask = mask_info
+                                        break
+                            except Exception:
+                                continue
+                        
+                        # Second pass: if no context match, use any resolution match
+                        if not matched_mask:
+                            for mask_info in candidates:
+                                try:
+                                    with Image.open(mask_info['path']) as mask_img:
+                                        mask_width, mask_height = mask_img.size
+                                    if cam_width == mask_width and cam_height == mask_height:
+                                        matched_mask = mask_info
+                                        break
+                                except Exception:
+                                    continue
+                        
+                        if matched_mask:
+                            self.camera_match_cache[(chunk.key, camera.key)] = matched_mask
         
+        # Update tree display for visible items
         iterator = QTreeWidgetItemIterator(self.tree_widget)
         while iterator.value():
             item = iterator.value()
@@ -287,41 +338,32 @@ class BatchMaskLoader(QDialog):
                 cam_key = item.data(0, Qt.UserRole)
                 cam_stem = os.path.splitext(cam_label)[0]
                 
-                # Check if any mask candidates exist for this stem
-                if cam_stem in self.mask_map:
-                    candidates = self.mask_map[cam_stem]
-                    camera = camera_map.get(cam_key)
-                    
-                    if camera and camera.sensor:
-                        cam_width = camera.sensor.width
-                        cam_height = camera.sensor.height
-                        
-                        # Find first candidate with matching resolution
-                        matched_mask = None
-                        for mask_info in candidates:
-                            try:
-                                with Image.open(mask_info['path']) as mask_img:
-                                    mask_width, mask_height = mask_img.size
-                                if cam_width == mask_width and cam_height == mask_height:
-                                    matched_mask = mask_info
-                                    break
-                            except Exception:
-                                continue
-                        
-                        if matched_mask:
-                            item.setText(0, f"🖼 {cam_label} (matched)")
-                            item.setForeground(0, QBrush(QColor("green")))
-                            item.setData(0, Qt.UserRole + 20, matched_mask)
-                        else:
-                            # Found candidates but none match resolution
-                            item.setText(0, f"🖼 {cam_label} (resolution mismatch)")
-                            item.setForeground(0, QBrush(QColor("red")))
-                            item.setData(0, Qt.UserRole + 20, None)
+                # Need chunk_key for cache lookup - find parent chunk item
+                parent = item.parent()
+                while parent and parent.data(0, Qt.UserRole + 99) == "image":
+                    parent = parent.parent()
+                # parent is now either a Group or Chunk item
+                if parent:
+                    # If parent is a Group, get its parent (Chunk)
+                    if parent.parent():
+                        chunk_key = parent.parent().data(0, Qt.UserRole)
                     else:
-                        # No sensor info, use first candidate
-                        item.setText(0, f"🖼 {cam_label} (matched)")
-                        item.setForeground(0, QBrush(QColor("green")))
-                        item.setData(0, Qt.UserRole + 20, candidates[0])
+                        chunk_key = parent.data(0, Qt.UserRole)
+                else:
+                    chunk_key = None
+                
+                cache_key = (chunk_key, cam_key) if chunk_key else None
+                
+                if cache_key and cache_key in self.camera_match_cache:
+                    # Matched
+                    item.setText(0, f"🖼 {cam_label} (matched)")
+                    item.setForeground(0, QBrush(QColor("green")))
+                    item.setData(0, Qt.UserRole + 20, self.camera_match_cache[cache_key])
+                elif cam_stem in self.mask_map:
+                    # Found candidates but none match resolution
+                    item.setText(0, f"🖼 {cam_label} (resolution mismatch)")
+                    item.setForeground(0, QBrush(QColor("red")))
+                    item.setData(0, Qt.UserRole + 20, None)
                 else:
                     # No mask found for this stem
                     item.setText(0, f"🖼 {cam_label} (missing)")
@@ -331,161 +373,79 @@ class BatchMaskLoader(QDialog):
             iterator += 1
 
     def import_masks(self):
-        """Perform the import"""
+        """Perform the import using cached match results."""
         if not self.root_path:
+            return
+        
+        if not hasattr(self, 'camera_match_cache') or not self.camera_match_cache:
+            QMessageBox.warning(self, "Warning", "No matching masks found. Please select a mask folder first.")
             return
 
         doc = Metashape.app.document
         
-        # Collect matched tasks
-        # { (mask_dir, mask_ext): [camera_obj_list] }
-        import_groups = {}
+        # Build active chunks/groups from UI
+        active_chunks = set()
+        active_groups = set()
         
-        # We need to map item -> camera object
-        # Since tree items are subsets (only head/tail), we cannot rely ONLY on tree items 
-        # if we want to import for ALL cameras.
-        # WAIT. The tree only shows head/tail. But the USER might expect ALL cameras to be processed.
-        # Logic: 
-        # 1. We should scan ALL cameras in the actual chunks, not just tree items.
-        # 2. Use tree items only for PREVIEW of matching status.
-        # 3. But the User can UNCHECK tree items (chunks/groups). Use this to filter.
-        
-        # Helper to check if a chunk/group is enabled.
-        # Since we use Tristate, we check top-level Chunks and Groups.
-        
-        # Let's iterate Chunks in Doc
-        tasks_count = 0
-        
-        iterator = QTreeWidgetItemIterator(self.tree_widget)
-        # Build set of unchecked keys (Chunks/Groups)
-        # Actually it's easier to verify "Is Checked" from UI? 
-        # But UI only has partial list.
-        # User experience: If I uncheck a Group in UI, I expect NO cameras in that group to import.
-        # So we must map UI state back to model.
-        
-        # Map IDs to CheckState
-        active_chunks = set() # keys
-        active_groups = set() # keys
-        
-        # Iterate top level
         root = self.tree_widget.invisibleRootItem()
         for i in range(root.childCount()):
             chunk_item = root.child(i)
             chunk_key = chunk_item.data(0, Qt.UserRole)
             
-            if chunk_item.checkState(0) != Qt.Unchecked: # Checked or PartiallyChecked
+            if chunk_item.checkState(0) != Qt.Unchecked:
                 active_chunks.add(chunk_key)
                 
-                # Check groups
                 for j in range(chunk_item.childCount()):
                     child_item = chunk_item.child(j)
-                    # Check if it is a group (has UserRole for group key) or generic image list container?
-                    # In my structure, Image Items are direct children of Chunk if no group. 
-                    # Group Items are children if group.
-                    
-                    # Distinguish Group from Image
-                    if child_item.data(0, Qt.UserRole + 99) == "image":
-                        # Direct image under chunk. 
-                        # If Chunk is checked, we assume we process these images.
-                        # Do we support unchecking individual images? 
-                        # The UI allows it, but since we don't show ALL images, we can't uncheck hidden ones.
-                        # Assumption: If parent (Chunk/Group) is checked, we process ALL its cameras 
-                        # UNLESS explicitly unchecked in UI? 
-                        # Use "Group/Chunk" level granularity for "hidden" items.
-                        # For "visible" items, we can respect individual checks? 
-                        # That complicates it. 
-                        # Simplification: Import follows Chunk/Group check state. 
-                        # If a user unchecks a specific visible image, we skip it.
-                        pass
-                    else:
-                        # This is a Group
+                    if child_item.data(0, Qt.UserRole + 99) != "image":
                         group_key = child_item.data(0, Qt.UserRole)
                         if child_item.checkState(0) == Qt.Checked:
                             active_groups.add(group_key)
 
-        # Now processing
-        try:
-            for chunk in doc.chunks:
-                if chunk.key not in active_chunks:
-                    continue
-                
-                chunk_cameras = []
-                
-                # Iterate all cameras in chunk
-                for camera in chunk.cameras:
-                    # Check Group filtering
-                    if camera.group:
-                        if camera.group.key not in active_groups:
-                            continue
-                    else:
-                        # If it's ungrouped, we rely on Chunk being active. 
-                        # But wait, if chunk is "Partially Checked" because some groups are off, 
-                        # are ungrouped images included? 
-                        # Usually yes, unless we had a specific "Ungrouped" container in UI. 
-                        # In my code: `_add_camera_items(chunk_item, ungrouped_cameras)`.
-                        # So they are direct children. If Chunk is Checked/Partial, we usually include them.
-                        pass
-                    
-                    # Match Mask - find candidate with matching resolution
-                    cam_stem = os.path.splitext(camera.label)[0]
-                    if cam_stem in self.mask_map:
-                        candidates = self.mask_map[cam_stem]
-                        cam_width = camera.sensor.width
-                        cam_height = camera.sensor.height
-                        
-                        # Find first candidate with matching resolution
-                        matched_mask = None
-                        for mask_info in candidates:
-                            try:
-                                with Image.open(mask_info['path']) as mask_img:
-                                    mask_width, mask_height = mask_img.size
-                                if cam_width == mask_width and cam_height == mask_height:
-                                    matched_mask = mask_info
-                                    break
-                            except Exception:
-                                continue
-                        
-                        if matched_mask:
-                            path_key = (matched_mask['dir'], matched_mask['ext'])
-                            if path_key not in import_groups:
-                                import_groups[path_key] = []
-                            import_groups[path_key].append(camera)
-                            tasks_count += 1
+        # Collect cameras to import using cached results
+        # Group by (mask_dir, mask_ext, chunk_key) for batch processing
+        import_groups = {}  # {(mask_dir, mask_ext, chunk_key): [cameras]}
+        tasks_count = 0
+        
+        for chunk in doc.chunks:
+            if chunk.key not in active_chunks:
+                continue
             
-            # Execute Imports
-            if tasks_count == 0:
-                QMessageBox.information(self, "Info", "No matching masks found for selected cameras.")
-                return
+            for camera in chunk.cameras:
+                # Check Group filtering
+                if camera.group:
+                    if camera.group.key not in active_groups:
+                        continue
+                
+                # Use cached match result with composite key
+                cache_key = (chunk.key, camera.key)
+                if cache_key in self.camera_match_cache:
+                    mask_info = self.camera_match_cache[cache_key]
+                    group_key = (mask_info['dir'], mask_info['ext'], chunk.key)
+                    
+                    if group_key not in import_groups:
+                        import_groups[group_key] = []
+                    import_groups[group_key].append(camera)
+                    tasks_count += 1
+        
+        if tasks_count == 0:
+            QMessageBox.information(self, "Info", "No matching masks found for selected cameras.")
+            return
 
-            # Progress bar? Metashape calls are blocking.
-            
-            for (mask_dir, mask_ext), cameras in import_groups.items():
-                if not cameras: 
+        try:
+            # Execute batch import - one call per (mask_dir, mask_ext, chunk) combination
+            for (mask_dir, mask_ext, chunk_key), cameras in import_groups.items():
+                if not cameras:
                     continue
-                    
-                # Find chunk for these cameras. 
-                # generateMasks is a Chunk method, but takes a list of cameras. 
-                # All cameras in the list MUST belong to the chunk.
-                # So we must further subgroup by Chunk.
                 
-                chunk_groups = {} # {chunk_key: [cameras]}
-                for cam in cameras:
-                    c_chunk = cam.chunk
-                    if c_chunk.key not in chunk_groups:
-                        chunk_groups[c_chunk.key] = []
-                    chunk_groups[c_chunk.key].append(cam)
+                op_chunk = cameras[0].chunk
+                template = os.path.join(mask_dir, f"{{filename}}{mask_ext}")
                 
-                for c_key, c_cams in chunk_groups.items():
-                    # Pick the chunk from the first camera (they are all same chunk object ref usually)
-                    # or lookup by key from doc (safer if doc reloaded? No, obj ref is fine)
-                    op_chunk = c_cams[0].chunk
-                    
-                    # Pattern
-                    template = os.path.join(mask_dir, f"{{filename}}{mask_ext}")
-                    
-                    op_chunk.generateMasks(path=template, 
-                                         masking_mode=Metashape.MaskingModeFile, 
-                                         cameras=c_cams)
+                op_chunk.generateMasks(
+                    path=template,
+                    masking_mode=Metashape.MaskingModeFile,
+                    cameras=cameras
+                )
             
             QMessageBox.information(self, "Success", f"Imported masks for {tasks_count} cameras.")
             
