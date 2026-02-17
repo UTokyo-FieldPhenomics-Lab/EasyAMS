@@ -93,6 +93,29 @@ def get_chunk_type_counts(chunk) -> Dict[str, int]:
     }
 
 
+def build_preview_for_chunk(chunk) -> List[str]:
+    """Build preview labels for one chunk in ``Type (count)`` format.
+
+    Parameters
+    ----------
+    chunk : object
+        Metashape chunk-like object.
+
+    Returns
+    -------
+    List[str]
+        Preview labels for item types present in the chunk.
+    """
+    counts = get_chunk_type_counts(chunk)
+    labels: List[str] = []
+    for item_type in ITEM_TYPES:
+        count = counts.get(item_type, 0)
+        if count <= 0:
+            continue
+        labels.append(f"{item_type} ({count})")
+    return labels
+
+
 def _get_chunks() -> List[object]:
     """Get chunk list from current document safely."""
     document = getattr(Metashape.app, "document", None)
@@ -231,16 +254,20 @@ class BatchRemoveItemsDialog(QDialog):
         for index, chunk in enumerate(self._chunks):
             chunk_key = getattr(chunk, "key", index)
             counts = self._chunk_counts.get(chunk_key, {})
+            preview_labels = build_preview_for_chunk(chunk)
             chunk_item = QTreeWidgetItem(self.tree_widget)
             chunk_item.setText(0, getattr(chunk, "label", "Unnamed Chunk"))
             chunk_item.setData(0, Qt.UserRole, chunk_key)
             chunk_item.setFlags(chunk_item.flags() | Qt.ItemIsUserCheckable)
             chunk_item.setCheckState(0, Qt.Unchecked)
-            for item_type in self._visible_item_types:
+            for label in preview_labels:
+                item_type = self._extract_type_name(label)
+                if item_type not in self._visible_item_types:
+                    continue
                 if counts.get(item_type, 0) <= 0:
                     continue
                 type_item = QTreeWidgetItem(chunk_item)
-                type_item.setText(0, f"{item_type} ({counts[item_type]})")
+                type_item.setText(0, label)
 
     def _on_tree_item_changed(self, item: QTreeWidgetItem, _column: int) -> None:
         """Refresh preview when chunk check states change."""

@@ -262,3 +262,28 @@ def test_preview_updates_to_red_strike_for_selected_deletions(monkeypatch):
 
     camera_node = chunk_item.child(0)
     assert camera_node.font(0).strikeOut() is True
+
+
+def test_preview_labels_follow_type_count_format():
+    from easyams.batch_tools.remove_items import build_preview_for_chunk
+
+    chunk = types.SimpleNamespace(
+        cameras=[1, 2],
+        markers=[1, 2, 3],
+        scalebars=[],
+        shapes=[],
+        depth_maps=None,
+        point_cloud=object(),
+        model=None,
+        tiled_model=None,
+        elevation=None,
+        orthomosaic=None,
+        tie_points=object(),
+    )
+
+    preview = build_preview_for_chunk(chunk)
+
+    assert "Cameras (2)" in preview
+    assert "Markers (3)" in preview
+    assert "Point Clouds (1)" in preview
+    assert "Tie Points (1)" in preview
