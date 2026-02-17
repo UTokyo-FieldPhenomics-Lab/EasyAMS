@@ -10,6 +10,7 @@ from PySide2.QtWidgets import (
     QHBoxLayout,
     QListWidget,
     QListWidgetItem,
+    QMessageBox,
     QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -124,6 +125,190 @@ def _get_chunks() -> List[object]:
     return list(getattr(document, "chunks", []))
 
 
+def _clear_sequence_attr(chunk, attr_name: str) -> None:
+    """Clear a sequence-like chunk attribute safely."""
+    items = getattr(chunk, attr_name, None)
+    if items is None:
+        return
+    try:
+        items.clear()
+        return
+    except Exception:
+        pass
+    try:
+        del items[:]
+        return
+    except Exception:
+        pass
+    try:
+        setattr(chunk, attr_name, [])
+    except Exception:
+        return
+
+
+def _remove_shapes_by_group(shapes_obj) -> None:
+    """Remove all shapes first, then remove shape groups."""
+    remove_fn = getattr(shapes_obj, "remove", None)
+    if not callable(remove_fn):
+        return
+    groups = list(getattr(shapes_obj, "groups", []))
+    for group in groups:
+        try:
+            shapes = [
+                shape
+                for shape in list(shapes_obj)
+                if getattr(shape, "group", None) == group
+            ]
+        except Exception:
+            shapes = []
+        for shape in shapes:
+            try:
+                remove_fn(shape)
+            except Exception:
+                continue
+        try:
+            remove_fn(group)
+        except Exception:
+            continue
+    try:
+        leftovers = list(shapes_obj)
+    except Exception:
+        leftovers = []
+    for shape in leftovers:
+        try:
+            remove_fn(shape)
+        except Exception:
+            continue
+
+
+def _clear_object_attr(chunk, attr_name: str) -> None:
+    """Set an object-like chunk attribute to ``None``."""
+    if not hasattr(chunk, attr_name):
+        return
+    setattr(chunk, attr_name, None)
+
+
+def _delete_cameras(chunk) -> None:
+    """Delete cameras and camera groups in one chunk."""
+    _clear_sequence_attr(chunk, "cameras")
+    _clear_sequence_attr(chunk, "camera_groups")
+
+
+def _delete_markers(chunk) -> None:
+    """Delete markers in one chunk."""
+    _clear_sequence_attr(chunk, "markers")
+
+
+def _delete_shapes(chunk) -> None:
+    """Delete shapes in one chunk."""
+    shapes_obj = getattr(chunk, "shapes", None)
+    if shapes_obj is None:
+        return
+    _remove_shapes_by_group(shapes_obj)
+    chunk_remove = getattr(chunk, "remove", None)
+    if not callable(chunk_remove):
+        return
+    try:
+        chunk_remove(shapes_obj)
+    except Exception:
+        try:
+            chunk_remove([shapes_obj])
+        except Exception:
+            return
+
+
+def _delete_tie_points(chunk) -> None:
+    """Delete tie points reference in one chunk."""
+    _clear_object_attr(chunk, "tie_points")
+
+
+def _delete_point_cloud(chunk) -> None:
+    """Delete point cloud reference in one chunk."""
+    _clear_object_attr(chunk, "point_cloud")
+
+
+def _delete_model(chunk) -> None:
+    """Delete model reference in one chunk."""
+    _clear_object_attr(chunk, "model")
+
+
+def _delete_elevation(chunk) -> None:
+    """Delete elevation reference in one chunk."""
+    _clear_object_attr(chunk, "elevation")
+
+
+def _delete_orthomosaic(chunk) -> None:
+    """Delete orthomosaic reference in one chunk."""
+    _clear_object_attr(chunk, "orthomosaic")
+
+
+def _delete_depth_maps(chunk) -> None:
+    """Delete depth maps reference in one chunk."""
+    _clear_object_attr(chunk, "depth_maps")
+
+
+DELETE_HANDLER_BY_TYPE = {
+    "Cameras": _delete_cameras,
+    "Markers": _delete_markers,
+    "Shapes": _delete_shapes,
+    "Tie Points": _delete_tie_points,
+    "Point Clouds": _delete_point_cloud,
+    "Models": _delete_model,
+    "Elevation Models": _delete_elevation,
+    "Orthomosaics": _delete_orthomosaic,
+    "Depth Maps": _delete_depth_maps,
+}
+
+
+def apply_type_deletion(chunk, selected_types: List[str]) -> None:
+    """Apply type-based deletion handlers on one chunk.
+
+    Parameters
+    ----------
+    chunk : object
+        Metashape chunk-like object.
+    selected_types : List[str]
+        Selected item type names from UI.
+    """
+    for item_type in selected_types:
+        handler = DELETE_HANDLER_BY_TYPE.get(item_type)
+        if handler is None:
+            continue
+        handler(chunk)
+
+
+def build_confirmation_message(
+    selected_chunk_keys: List[int], selected_types: List[str], total_nodes: int = 0
+) -> str:
+    """Build confirmation dialog message with optional warnings.
+
+    Parameters
+    ----------
+    selected_chunk_keys : List[int]
+        Selected chunk keys for deletion.
+    selected_types : List[str]
+        Selected item types for deletion.
+    total_nodes : int, default=0
+        Total impacted preview nodes.
+
+    Returns
+    -------
+    str
+        Rich-text confirmation message.
+    """
+    lines = [
+        f"Chunks: {len(selected_chunk_keys)}",
+        f"Types: {', '.join(selected_types)}",
+        f"Impacted nodes: {total_nodes}",
+    ]
+    if "Shapes" in selected_types:
+        lines.append(
+            "<span style='color:#cc2222;'><b>Warning:</b> "
+            "Metashape may keep a default empty shape layer due to API limits.</span>"
+        )
+    return "<br/>".join(lines)
+
+
 def get_metashape_version() -> str:
     """Get the current Metashape version string."""
     return getattr(Metashape.app, "version", "0.0.0")
@@ -234,6 +419,7 @@ class BatchRemoveItemsDialog(QDialog):
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         execute_btn = QPushButton("Execute")
+        execute_btn.clicked.connect(self.execute_remove)
         actions.addStretch()
         actions.addWidget(cancel_btn)
         actions.addWidget(execute_btn)
@@ -242,6 +428,7 @@ class BatchRemoveItemsDialog(QDialog):
 
     def _populate_item_types(self) -> None:
         """Fill item list and disable unsupported item types."""
+        self.item_list.clear()
         for item_type in self._visible_item_types:
             item = QListWidgetItem(item_type)
             if not self._supported_types.get(item_type, False):
@@ -337,6 +524,71 @@ class BatchRemoveItemsDialog(QDialog):
                 continue
             return bool(item.flags() & Qt.ItemIsEnabled)
         return False
+
+    def _get_chunk_by_key(self, chunk_key):
+        """Get chunk object from cached chunk list by key."""
+        for index, chunk in enumerate(self._chunks):
+            key = getattr(chunk, "key", index)
+            if key != chunk_key:
+                continue
+            return chunk
+        return None
+
+    def _collect_target_count(
+        self, selected_chunk_keys: List[int], selected_types: List[str]
+    ) -> int:
+        """Count total impacted type nodes for confirmation summary."""
+        total = 0
+        for chunk_key in selected_chunk_keys:
+            counts = self._chunk_counts.get(chunk_key, {})
+            for item_type in selected_types:
+                if counts.get(item_type, 0) <= 0:
+                    continue
+                total += 1
+        return total
+
+    def confirm_execution(self) -> bool:
+        """Show execution confirmation and return explicit choice."""
+        selected_types = self.get_selected_item_types()
+        selected_chunk_keys = self.get_selected_chunk_keys()
+        if not selected_types or not selected_chunk_keys:
+            return False
+        total_nodes = self._collect_target_count(selected_chunk_keys, selected_types)
+        summary = build_confirmation_message(
+            selected_chunk_keys=selected_chunk_keys,
+            selected_types=selected_types,
+            total_nodes=total_nodes,
+        )
+        answer = QMessageBox.question(
+            self,
+            "Confirm Remove Items",
+            summary,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
+
+    def execute_remove(self) -> None:
+        """Execute type-based deletion on selected chunks after confirmation."""
+        selected_types = self.get_selected_item_types()
+        selected_chunk_keys = self.get_selected_chunk_keys()
+        if not selected_types or not selected_chunk_keys:
+            return
+        if not self.confirm_execution():
+            return
+        for chunk_key in selected_chunk_keys:
+            chunk = self._get_chunk_by_key(chunk_key)
+            if chunk is None:
+                continue
+            apply_type_deletion(chunk, selected_types)
+        self._chunk_counts = {
+            getattr(chunk, "key", index): get_chunk_type_counts(chunk)
+            for index, chunk in enumerate(self._chunks)
+        }
+        self._visible_item_types = self._collect_visible_item_types()
+        self._populate_item_types()
+        self._populate_chunk_tree()
+        self._refresh_preview()
 
 
 def create_batch_remove_items():

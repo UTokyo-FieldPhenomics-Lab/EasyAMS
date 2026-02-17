@@ -287,3 +287,178 @@ def test_preview_labels_follow_type_count_format():
     assert "Markers (3)" in preview
     assert "Point Clouds (1)" in preview
     assert "Tie Points (1)" in preview
+
+
+def test_deletion_cameras_also_removes_groups():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    chunk = types.SimpleNamespace(cameras=[1, 2], camera_groups=[1], model=None)
+    apply_type_deletion(chunk, ["Cameras"])
+
+    assert len(chunk.cameras) == 0
+    assert len(chunk.camera_groups) == 0
+
+
+def test_deletion_heavy_assets_type_based():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    chunk = types.SimpleNamespace(
+        model=object(),
+        elevation=object(),
+        orthomosaic=object(),
+    )
+    apply_type_deletion(chunk, ["Models", "Elevation Models", "Orthomosaics"])
+
+    assert chunk.model is None
+    assert chunk.elevation is None
+    assert chunk.orthomosaic is None
+
+
+def test_deletion_shapes_uses_shapes_remove_api():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    called = {"remove": 0}
+
+    class _Shapes:
+        def __init__(self):
+            self.shapes = ["s1", "s2"]
+            self.groups = ["g1"]
+
+        def remove(self, items):
+            called["remove"] += 1
+            assert len(items) == 3
+
+    chunk = types.SimpleNamespace(shapes=_Shapes())
+    apply_type_deletion(chunk, ["Shapes"])
+
+    assert called["remove"] == 1
+
+
+def test_deletion_shapes_attempts_remove_layer_container():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    called = {"layer_remove": 0}
+
+    class _Shapes:
+        def __init__(self):
+            self.shapes = ["s1"]
+            self.groups = []
+
+        def remove(self, _items):
+            return None
+
+    class _Chunk:
+        def __init__(self):
+            self.shapes = _Shapes()
+
+        def remove(self, _items):
+            called["layer_remove"] += 1
+
+    chunk = _Chunk()
+    apply_type_deletion(chunk, ["Shapes"])
+
+    assert called["layer_remove"] == 1
+
+
+def test_deletion_shapes_removes_by_group_then_group_nodes():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    removed = []
+
+    class _Group:
+        def __init__(self, name):
+            self.name = name
+
+        def __repr__(self):
+            return f"Group({self.name})"
+
+    class _Shape:
+        def __init__(self, name, group):
+            self.name = name
+            self.group = group
+
+        def __repr__(self):
+            return f"Shape({self.name})"
+
+    g1 = _Group("g1")
+    g2 = _Group("g2")
+
+    class _Shapes:
+        def __init__(self):
+            self.groups = [g1, g2]
+            self._items = [
+                _Shape("s1", g1),
+                _Shape("s2", g1),
+                _Shape("s3", g2),
+            ]
+
+        def __iter__(self):
+            return iter(self._items)
+
+        def remove(self, item):
+            removed.append(item)
+            if item in self.groups:
+                self.groups.remove(item)
+                return
+            if item in self._items:
+                self._items.remove(item)
+
+    chunk = types.SimpleNamespace(shapes=_Shapes())
+    apply_type_deletion(chunk, ["Shapes"])
+
+    assert g1 in removed
+    assert g2 in removed
+
+
+def test_confirm_execute_requires_explicit_yes(monkeypatch):
+    from easyams.batch_tools.remove_items import BatchRemoveItemsDialog
+
+    class _Chunk:
+        def __init__(self):
+            self.key = 1
+            self.label = "Chunk A"
+            self.cameras = [1]
+            self.markers = []
+            self.scalebars = []
+            self.shapes = []
+            self.depth_maps = None
+            self.point_cloud = None
+            self.model = None
+            self.tiled_model = None
+            self.elevation = None
+            self.orthomosaic = None
+            self.tie_points = None
+
+    fake_doc = types.SimpleNamespace(chunks=[_Chunk()])
+    fake_app = types.SimpleNamespace(document=fake_doc)
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.Metashape",
+        types.SimpleNamespace(app=fake_app),
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.resolve_dialog_capabilities",
+        lambda: {"Cameras": True},
+    )
+
+    _get_qapp()
+    dialog = BatchRemoveItemsDialog(parent=None)
+
+    root = dialog.tree_widget.invisibleRootItem()
+    chunk_item = root.child(0)
+    chunk_item.setCheckState(0, Qt.CheckState.Checked)
+    dialog.item_list.item(0).setSelected(True)
+
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.question",
+        lambda *_args, **_kwargs: 16384,
+    )
+    assert dialog.confirm_execution() is True
+
+
+def test_confirmation_message_contains_red_shapes_warning():
+    from easyams.batch_tools.remove_items import build_confirmation_message
+
+    message = build_confirmation_message([1], ["Shapes"])
+
+    assert "color:#cc2222" in message
+    assert "default empty shape layer" in message.lower()
