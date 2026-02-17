@@ -121,11 +121,23 @@ def test_unknown_new_version_clones_nearest_then_probes(monkeypatch):
     assert caps["_probed"] is True
 
 
-def test_batch_import_shim_not_recursive():
-    from easyams import batch_import
+def test_batch_import_module_removed():
+    import importlib
+
+    try:
+        importlib.import_module("easyams.batch_import")
+    except ModuleNotFoundError:
+        assert True
+        return
+    raise AssertionError("easyams.batch_import should be removed")
+
+
+def test_batch_tools_modules_do_not_backref_batch_import():
     from easyams import batch_tools
 
-    assert batch_import.images is not batch_tools.images
+    assert hasattr(batch_tools.images, "_legacy_images") is False
+    assert hasattr(batch_tools.masks, "_legacy_masks") is False
+    assert hasattr(batch_tools.markers, "_legacy_markers") is False
 
 
 def test_remove_items_only_shows_existing_types(monkeypatch):
