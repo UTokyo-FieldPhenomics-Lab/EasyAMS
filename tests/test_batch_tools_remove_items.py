@@ -311,6 +311,25 @@ def test_deletion_cameras_also_removes_groups():
     assert len(chunk.camera_groups) == 0
 
 
+def test_deletion_cameras_prefers_chunk_remove_api():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    removed = []
+
+    class _Chunk:
+        def __init__(self):
+            self.cameras = ("c1", "c2")
+            self.camera_groups = ("g1",)
+
+        def remove(self, items):
+            removed.append(list(items))
+
+    chunk = _Chunk()
+    apply_type_deletion(chunk, ["Cameras"])
+
+    assert removed == [["c1", "c2"], ["g1"]]
+
+
 def test_deletion_heavy_assets_type_based():
     from easyams.batch_tools.remove_items import apply_type_deletion
 
@@ -324,6 +343,47 @@ def test_deletion_heavy_assets_type_based():
     assert chunk.model is None
     assert chunk.elevation is None
     assert chunk.orthomosaic is None
+
+
+def test_deletion_heavy_assets_prefers_chunk_remove_api():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    removed = []
+    model = object()
+    elevation = object()
+    orthomosaic = object()
+
+    class _Chunk:
+        def __init__(self):
+            self.model = model
+            self.elevation = elevation
+            self.orthomosaic = orthomosaic
+
+        def remove(self, item):
+            removed.append(item)
+
+    chunk = _Chunk()
+    apply_type_deletion(chunk, ["Models", "Elevation Models", "Orthomosaics"])
+
+    assert removed == [model, elevation, orthomosaic]
+
+
+def test_deletion_scalebars_prefers_chunk_remove_api():
+    from easyams.batch_tools.remove_items import apply_type_deletion
+
+    removed = []
+
+    class _Chunk:
+        def __init__(self):
+            self.scalebars = ("sb1", "sb2")
+
+        def remove(self, items):
+            removed.append(list(items))
+
+    chunk = _Chunk()
+    apply_type_deletion(chunk, ["Scale Bars"])
+
+    assert removed == [["sb1", "sb2"]]
 
 
 def test_deletion_shapes_uses_shapes_remove_api():

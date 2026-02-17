@@ -188,15 +188,61 @@ def _clear_object_attr(chunk, attr_name: str) -> None:
     setattr(chunk, attr_name, None)
 
 
+def _remove_from_chunk(chunk, value) -> bool:
+    """Try removing values through ``chunk.remove`` API.
+
+    Parameters
+    ----------
+    chunk : object
+        Metashape chunk-like object with optional ``remove`` method.
+    value : object
+        Single item or sequence of items to remove.
+
+    Returns
+    -------
+    bool
+        ``True`` when removal succeeds.
+    """
+    chunk_remove = getattr(chunk, "remove", None)
+    if not callable(chunk_remove):
+        return False
+    try:
+        chunk_remove(value)
+        return True
+    except Exception:
+        pass
+    try:
+        if isinstance(value, (list, tuple, set)):
+            chunk_remove(list(value))
+            return True
+        chunk_remove([value])
+        return True
+    except Exception:
+        return False
+
+
 def _delete_cameras(chunk) -> None:
     """Delete cameras and camera groups in one chunk."""
-    _clear_sequence_attr(chunk, "cameras")
-    _clear_sequence_attr(chunk, "camera_groups")
+    cameras = list(getattr(chunk, "cameras", []) or [])
+    if cameras and not _remove_from_chunk(chunk, cameras):
+        _clear_sequence_attr(chunk, "cameras")
+    camera_groups = list(getattr(chunk, "camera_groups", []) or [])
+    if camera_groups and not _remove_from_chunk(chunk, camera_groups):
+        _clear_sequence_attr(chunk, "camera_groups")
 
 
 def _delete_markers(chunk) -> None:
     """Delete markers in one chunk."""
-    _clear_sequence_attr(chunk, "markers")
+    markers = list(getattr(chunk, "markers", []) or [])
+    if markers and not _remove_from_chunk(chunk, markers):
+        _clear_sequence_attr(chunk, "markers")
+
+
+def _delete_scalebars(chunk) -> None:
+    """Delete scale bars in one chunk."""
+    scalebars = list(getattr(chunk, "scalebars", []) or [])
+    if scalebars and not _remove_from_chunk(chunk, scalebars):
+        _clear_sequence_attr(chunk, "scalebars")
 
 
 def _delete_shapes(chunk) -> None:
@@ -219,41 +265,62 @@ def _delete_shapes(chunk) -> None:
 
 def _delete_tie_points(chunk) -> None:
     """Delete tie points reference in one chunk."""
-    _clear_object_attr(chunk, "tie_points")
+    tie_points = getattr(chunk, "tie_points", None)
+    if tie_points is not None and not _remove_from_chunk(chunk, tie_points):
+        _clear_object_attr(chunk, "tie_points")
 
 
 def _delete_point_cloud(chunk) -> None:
     """Delete point cloud reference in one chunk."""
-    _clear_object_attr(chunk, "point_cloud")
+    point_cloud = getattr(chunk, "point_cloud", None)
+    if point_cloud is not None and not _remove_from_chunk(chunk, point_cloud):
+        _clear_object_attr(chunk, "point_cloud")
 
 
 def _delete_model(chunk) -> None:
     """Delete model reference in one chunk."""
-    _clear_object_attr(chunk, "model")
+    model = getattr(chunk, "model", None)
+    if model is not None and not _remove_from_chunk(chunk, model):
+        _clear_object_attr(chunk, "model")
+
+
+def _delete_tiled_model(chunk) -> None:
+    """Delete tiled model reference in one chunk."""
+    tiled_model = getattr(chunk, "tiled_model", None)
+    if tiled_model is not None and not _remove_from_chunk(chunk, tiled_model):
+        _clear_object_attr(chunk, "tiled_model")
 
 
 def _delete_elevation(chunk) -> None:
     """Delete elevation reference in one chunk."""
-    _clear_object_attr(chunk, "elevation")
+    elevation = getattr(chunk, "elevation", None)
+    if elevation is not None and not _remove_from_chunk(chunk, elevation):
+        _clear_object_attr(chunk, "elevation")
 
 
 def _delete_orthomosaic(chunk) -> None:
     """Delete orthomosaic reference in one chunk."""
-    _clear_object_attr(chunk, "orthomosaic")
+    orthomosaic = getattr(chunk, "orthomosaic", None)
+    if orthomosaic is not None and not _remove_from_chunk(chunk, orthomosaic):
+        _clear_object_attr(chunk, "orthomosaic")
 
 
 def _delete_depth_maps(chunk) -> None:
     """Delete depth maps reference in one chunk."""
-    _clear_object_attr(chunk, "depth_maps")
+    depth_maps = getattr(chunk, "depth_maps", None)
+    if depth_maps is not None and not _remove_from_chunk(chunk, depth_maps):
+        _clear_object_attr(chunk, "depth_maps")
 
 
 DELETE_HANDLER_BY_TYPE = {
     "Cameras": _delete_cameras,
     "Markers": _delete_markers,
+    "Scale Bars": _delete_scalebars,
     "Shapes": _delete_shapes,
     "Tie Points": _delete_tie_points,
     "Point Clouds": _delete_point_cloud,
     "Models": _delete_model,
+    "Tiled Models": _delete_tiled_model,
     "Elevation Models": _delete_elevation,
     "Orthomosaics": _delete_orthomosaic,
     "Depth Maps": _delete_depth_maps,
