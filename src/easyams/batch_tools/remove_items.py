@@ -589,6 +589,11 @@ class BatchRemoveItemsDialog(QDialog):
         self._populate_item_types()
         self._populate_chunk_tree()
         self._refresh_preview()
+        QMessageBox.information(
+            self,
+            "Remove Items",
+            "Selected item types were removed in memory. Project is not auto-saved.",
+        )
 
 
 def create_batch_remove_items():

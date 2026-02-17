@@ -452,6 +452,10 @@ def test_confirm_execute_requires_explicit_yes(monkeypatch):
         "easyams.batch_tools.remove_items.QMessageBox.question",
         lambda *_args, **_kwargs: 16384,
     )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.information",
+        lambda *_args, **_kwargs: None,
+    )
     assert dialog.confirm_execution() is True
 
 
@@ -462,3 +466,116 @@ def test_confirmation_message_contains_red_shapes_warning():
 
     assert "color:#cc2222" in message
     assert "default empty shape layer" in message.lower()
+
+
+def test_execute_does_not_call_document_save(monkeypatch):
+    from easyams.batch_tools.remove_items import BatchRemoveItemsDialog
+
+    called = {"save": 0}
+
+    class _Chunk:
+        def __init__(self):
+            self.key = 1
+            self.label = "Chunk A"
+            self.cameras = [1]
+            self.camera_groups = []
+            self.markers = []
+            self.scalebars = []
+            self.shapes = []
+            self.depth_maps = None
+            self.point_cloud = None
+            self.model = None
+            self.tiled_model = None
+            self.elevation = None
+            self.orthomosaic = None
+            self.tie_points = None
+
+    class _Doc:
+        def __init__(self):
+            self.chunks = [_Chunk()]
+
+        def save(self):
+            called["save"] += 1
+
+    fake_doc = _Doc()
+    fake_app = types.SimpleNamespace(document=fake_doc)
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.Metashape",
+        types.SimpleNamespace(app=fake_app),
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.resolve_dialog_capabilities",
+        lambda: {"Cameras": True},
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.question",
+        lambda *_args, **_kwargs: 16384,
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.information",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _get_qapp()
+    dialog = BatchRemoveItemsDialog(parent=None)
+    root = dialog.tree_widget.invisibleRootItem()
+    chunk_item = root.child(0)
+    chunk_item.setCheckState(0, Qt.CheckState.Checked)
+    dialog.item_list.item(0).setSelected(True)
+
+    dialog.execute_remove()
+
+    assert called["save"] == 0
+
+
+def test_execute_shows_result_dialog(monkeypatch):
+    from easyams.batch_tools.remove_items import BatchRemoveItemsDialog
+
+    shown = {"info": 0}
+
+    class _Chunk:
+        def __init__(self):
+            self.key = 1
+            self.label = "Chunk A"
+            self.cameras = [1]
+            self.camera_groups = []
+            self.markers = []
+            self.scalebars = []
+            self.shapes = []
+            self.depth_maps = None
+            self.point_cloud = None
+            self.model = None
+            self.tiled_model = None
+            self.elevation = None
+            self.orthomosaic = None
+            self.tie_points = None
+
+    fake_doc = types.SimpleNamespace(chunks=[_Chunk()])
+    fake_app = types.SimpleNamespace(document=fake_doc)
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.Metashape",
+        types.SimpleNamespace(app=fake_app),
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.resolve_dialog_capabilities",
+        lambda: {"Cameras": True},
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.question",
+        lambda *_args, **_kwargs: 16384,
+    )
+    monkeypatch.setattr(
+        "easyams.batch_tools.remove_items.QMessageBox.information",
+        lambda *_args, **_kwargs: shown.__setitem__("info", shown["info"] + 1),
+    )
+
+    _get_qapp()
+    dialog = BatchRemoveItemsDialog(parent=None)
+    root = dialog.tree_widget.invisibleRootItem()
+    chunk_item = root.child(0)
+    chunk_item.setCheckState(0, Qt.CheckState.Checked)
+    dialog.item_list.item(0).setSelected(True)
+
+    dialog.execute_remove()
+
+    assert shown["info"] == 1
